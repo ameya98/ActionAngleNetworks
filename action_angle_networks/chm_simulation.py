@@ -25,7 +25,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def compute_normal_modes(simulation_parameters):
+def compute_normal_modes(
+    simulation_parameters: Mapping[str, chex.Array]
+) -> Tuple[chex.Array, chex.Array]:
     """Returns the angular frequencies and eigenvectors for the normal modes."""
     m, k_wall, k_pair = (
         simulation_parameters["m"],
@@ -48,8 +50,10 @@ def compute_normal_modes(simulation_parameters):
     return w, eigvecs
 
 
-def generate_canonical_coordinates(t, simulation_parameters):
-    """Returns q (position) and p (momentum) coordinates at instant t."""
+def generate_canonical_coordinates(
+    t: chex.Array, simulation_parameters: Mapping[str, chex.Array]
+):
+    """Returns q (position) and p (momentum) coordinates at time t."""
     w, eigvecs = compute_normal_modes(simulation_parameters)
     m = simulation_parameters["m"]
     normal_mode_simulation_parameters = {
@@ -70,8 +74,8 @@ def generate_canonical_coordinates(t, simulation_parameters):
 
 
 def generate_canonical_coordinates_for_normal_mode(
-    t,
-    mode_simulation_parameters,
+    t: chex.Array,
+    mode_simulation_parameters: Mapping[str, chex.Array],
 ):
     """Returns q (position) and p (momentum) coordinates at instant t."""
     phi, a, m, w = (
@@ -85,14 +89,14 @@ def generate_canonical_coordinates_for_normal_mode(
     return position, momentum
 
 
-def _squared_l2_distance(u, v):
+def _squared_l2_distance(u: chex.Array, v: chex.Array) -> chex.Array:
     return jnp.square(u - v).sum()
 
 
 def compute_hamiltonian(
-    position,
-    momentum,
-    simulation_parameters,
+    position: chex.Array,
+    momentum: chex.Array,
+    simulation_parameters: Mapping[str, chex.Array],
 ):
     """Computes the Hamiltonian at the given coordinates."""
     m, k_wall, k_pair = (
@@ -111,7 +115,12 @@ def compute_hamiltonian(
     return hamiltonian
 
 
-def plot_coordinates(positions, momentums, simulation_parameters, title):
+def plot_coordinates(
+    positions: chex.Array,
+    momentums: chex.Array,
+    simulation_parameters: Mapping[str, chex.Array],
+    title: str,
+):
     """Plots coordinates in the canonical basis."""
     assert len(positions) == len(momentums)
 
@@ -217,10 +226,10 @@ def plot_coordinates(positions, momentums, simulation_parameters, title):
 
 
 def plot_coordinates_in_phase_space(
-    positions,
-    momentums,
-    simulation_parameters,
-    title,
+    positions: chex.Array,
+    momentums: chex.Array,
+    simulation_parameters: Mapping[str, chex.Array],
+    title: str,
 ):
     """Plots a phase space diagram of the given coordinates."""
     assert len(positions) == len(momentums)

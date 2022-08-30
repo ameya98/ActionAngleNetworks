@@ -91,7 +91,7 @@ def get_compute_hamiltonian_fn(config: ml_collections.ConfigDict):
     raise ValueError("Unsupported simulation: {config.simulation}.")
 
 
-def create_scaler(config: ml_collections.ConfigDict):
+def create_scaler(config: ml_collections.ConfigDict) -> scalers.Scaler:
     """Constructs the scaler."""
     if config.scaler == "standard":
         return scalers.StandardScaler()
@@ -176,7 +176,9 @@ def create_model(config: ml_collections.ConfigDict):
     raise ValueError("Unsupported model.")
 
 
-def create_train_state(config: ml_collections.ConfigDict, rng, init_samples):
+def create_train_state(
+    config: ml_collections.ConfigDict, rng, init_samples
+) -> train_state.TrainState:
     """Creates the training state."""
     model = create_model(config)
     params = model.init(rng, *init_samples)
@@ -186,7 +188,10 @@ def create_train_state(config: ml_collections.ConfigDict, rng, init_samples):
 
 @jax.jit
 def compute_predictions(
-    state, positions: chex.Array, momentums: chex.Array, time_deltas
+    state: train_state.TrainState,
+    positions: chex.Array,
+    momentums: chex.Array,
+    time_deltas,
 ):
     """Computes model predictions."""
     return state.apply_fn(state.params, positions, momentums, time_deltas)
