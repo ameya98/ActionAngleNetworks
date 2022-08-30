@@ -24,79 +24,75 @@ import jax.numpy as jnp
 
 
 class Scaler(abc.ABC):
-  """Abstract base class for scalers."""
+    """Abstract base class for scalers."""
 
-  @abc.abstractmethod
-  def fit(self, data):
-    pass
+    @abc.abstractmethod
+    def fit(self, data):
+        pass
 
-  @abc.abstractmethod
-  def transform(self, data):
-    pass
+    @abc.abstractmethod
+    def transform(self, data):
+        pass
 
-  @abc.abstractmethod
-  def inverse_transform(self, data):
-    pass
+    @abc.abstractmethod
+    def inverse_transform(self, data):
+        pass
 
 
 @jax.tree_util.register_pytree_node_class
 class IdentityScaler(Scaler):
-  """Implements the identity scaler."""
+    """Implements the identity scaler."""
 
-  def fit(self, data):
-    return IdentityScaler()
+    def fit(self, data):
+        return IdentityScaler()
 
-  def transform(self, data):
-    return data
+    def transform(self, data):
+        return data
 
-  def inverse_transform(self, data):
-    return data
+    def inverse_transform(self, data):
+        return data
 
-  def tree_flatten(self):
-    return ((), None)
+    def tree_flatten(self):
+        return ((), None)
 
-  @classmethod
-  def tree_unflatten(cls, aux_data,
-                     children):
-    del aux_data, children
-    return cls()
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        del aux_data, children
+        return cls()
 
 
 @jax.tree_util.register_pytree_node_class
 class StandardScaler(Scaler):
-  """Implements sklearn.preprocessing.StandardScaler."""
+    """Implements sklearn.preprocessing.StandardScaler."""
 
-  def __init__(self,
-               mean = None,
-               std = None):
-    super(StandardScaler, self).__init__()
-    self._mean = mean
-    self._std = std
+    def __init__(self, mean=None, std=None):
+        super(StandardScaler, self).__init__()
+        self._mean = mean
+        self._std = std
 
-  def fit(self, data):
-    mean = jnp.mean(data, axis=0, keepdims=True)
-    std = jnp.std(data, axis=0, keepdims=True)
-    return StandardScaler(mean, std)
+    def fit(self, data):
+        mean = jnp.mean(data, axis=0, keepdims=True)
+        std = jnp.std(data, axis=0, keepdims=True)
+        return StandardScaler(mean, std)
 
-  def transform(self, data):
-    return (data - self.mean()) / self.std()
+    def transform(self, data):
+        return (data - self.mean()) / self.std()
 
-  def inverse_transform(self, data):
-    return data * self.std() + self.mean()
+    def inverse_transform(self, data):
+        return data * self.std() + self.mean()
 
-  def mean(self):
-    return self._mean
+    def mean(self):
+        return self._mean
 
-  def std(self):
-    return self._std
+    def std(self):
+        return self._std
 
-  def tree_flatten(self):
-    children = (self.mean(), self.std())
-    aux_data = None
-    return (children, aux_data)
+    def tree_flatten(self):
+        children = (self.mean(), self.std())
+        aux_data = None
+        return (children, aux_data)
 
-  @classmethod
-  def tree_unflatten(
-      cls, aux_data, children):
-    del aux_data
-    return cls(*children)
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        del aux_data
+        return cls(*children)

@@ -25,57 +25,53 @@ from action_angle_networks import scalers
 
 
 class TrainTest(parameterized.TestCase):
+    @parameterized.parameters(
+        {
+            "arr": [[1.0, 2.0, 3.0], [3.0, 4.0, 5.0]],
+            "arr_scaled": [[-1, -1, -1], [1, 1, 1]],
+            "mean": [2.0, 3.0, 4.0],
+            "std": [1.0, 1.0, 1.0],
+        },
+        {
+            "arr": [[11.0, 2.0, 3.0], [3.0, 4.0, 5.0]],
+            "arr_scaled": [[1, -1, -1], [-1, 1, 1]],
+            "mean": [7.0, 3.0, 4.0],
+            "std": [4.0, 1.0, 1.0],
+        },
+    )
+    def test_standard_scaler(self, arr, arr_scaled, mean, std):
+        arr = np.asarray(arr)
+        arr_scaled = np.asarray(arr_scaled)
 
-  @parameterized.parameters(
-      {
-          'arr': [[1., 2., 3.], [3., 4., 5.]],
-          'arr_scaled': [[-1, -1, -1], [1, 1, 1]],
-          'mean': [2., 3., 4.],
-          'std': [1., 1., 1.],
-      },
-      {
-          'arr': [[11., 2., 3.], [3., 4., 5.]],
-          'arr_scaled': [[1, -1, -1], [-1, 1, 1]],
-          'mean': [7., 3., 4.],
-          'std': [4., 1., 1.],
-      },
-  )
-  def test_standard_scaler(self, arr,
-                           arr_scaled,
-                           mean, std):
-    arr = np.asarray(arr)
-    arr_scaled = np.asarray(arr_scaled)
+        scaler = scalers.StandardScaler()
+        scaler = scaler.fit(arr)
 
-    scaler = scalers.StandardScaler()
-    scaler = scaler.fit(arr)
+        self.assertTrue(np.allclose(scaler.transform(arr), arr_scaled))
+        self.assertTrue(np.allclose(scaler.inverse_transform(arr_scaled), arr))
 
-    self.assertTrue(np.allclose(scaler.transform(arr), arr_scaled))
-    self.assertTrue(np.allclose(scaler.inverse_transform(arr_scaled), arr))
+        self.assertTrue(np.allclose(scaler.mean(), mean))
+        self.assertTrue(np.allclose(scaler.std(), std))
 
-    self.assertTrue(np.allclose(scaler.mean(), mean))
-    self.assertTrue(np.allclose(scaler.std(), std))
+    @parameterized.parameters(
+        {
+            "arr": [[1.0, 2.0, 3.0], [3.0, 4.0, 5.0]],
+            "arr_scaled": [[1.0, 2.0, 3.0], [3.0, 4.0, 5.0]],
+        },
+        {
+            "arr": [[11.0, 2.0, 3.0], [3.0, 4.0, 5.0]],
+            "arr_scaled": [[11.0, 2.0, 3.0], [3.0, 4.0, 5.0]],
+        },
+    )
+    def test_identity_scaler(self, arr, arr_scaled):
+        arr = np.asarray(arr)
+        arr_scaled = np.asarray(arr_scaled)
 
-  @parameterized.parameters(
-      {
-          'arr': [[1., 2., 3.], [3., 4., 5.]],
-          'arr_scaled': [[1., 2., 3.], [3., 4., 5.]],
-      },
-      {
-          'arr': [[11., 2., 3.], [3., 4., 5.]],
-          'arr_scaled': [[11., 2., 3.], [3., 4., 5.]],
-      },
-  )
-  def test_identity_scaler(self, arr,
-                           arr_scaled):
-    arr = np.asarray(arr)
-    arr_scaled = np.asarray(arr_scaled)
+        scaler = scalers.IdentityScaler()
+        scaler = scaler.fit(arr)
 
-    scaler = scalers.IdentityScaler()
-    scaler = scaler.fit(arr)
-
-    self.assertTrue(np.allclose(scaler.transform(arr), arr_scaled))
-    self.assertTrue(np.allclose(scaler.inverse_transform(arr_scaled), arr))
+        self.assertTrue(np.allclose(scaler.transform(arr), arr_scaled))
+        self.assertTrue(np.allclose(scaler.inverse_transform(arr_scaled), arr))
 
 
-if __name__ == '__main__':
-  absltest.main()
+if __name__ == "__main__":
+    absltest.main()

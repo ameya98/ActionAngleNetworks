@@ -27,37 +27,40 @@ import tensorflow as tf
 from action_angle_networks import train
 
 
-_WORKDIR = flags.DEFINE_string('workdir', None,
-                               'Directory to store model data.')
+_WORKDIR = flags.DEFINE_string("workdir", None, "Directory to store model data.")
 _CONFIG = config_flags.DEFINE_config_file(
-    'config',
+    "config",
     None,
-    'File path to the training hyperparameter configuration.',
-    lock_config=False)
+    "File path to the training hyperparameter configuration.",
+    lock_config=False,
+)
 
 
 def main(argv):
-  if len(argv) > 1:
-    raise app.UsageError('Too many command-line arguments.')
+    if len(argv) > 1:
+        raise app.UsageError("Too many command-line arguments.")
 
-  # Hide any GPUs from TensorFlow. Otherwise TF might reserve memory and make
-  # it unavailable to JAX.
-  tf.config.experimental.set_visible_devices([], 'GPU')
+    # Hide any GPUs from TensorFlow. Otherwise TF might reserve memory and make
+    # it unavailable to JAX.
+    tf.config.experimental.set_visible_devices([], "GPU")
 
-  # This example only supports single-host training on a single device.
-  logging.info('JAX host: %d / %d', jax.process_index(), jax.process_count())
-  logging.info('JAX local devices: %r', jax.local_devices())
+    # This example only supports single-host training on a single device.
+    logging.info("JAX host: %d / %d", jax.process_index(), jax.process_count())
+    logging.info("JAX local devices: %r", jax.local_devices())
 
-  # Add a note so that we can tell which task is which JAX host.
-  # (Depending on the platform task 0 is not guaranteed to be host 0)
-  platform.work_unit().set_task_status(f'process_index: {jax.process_index()}, '
-                                       f'process_count: {jax.process_count()}')
-  platform.work_unit().create_artifact(platform.ArtifactType.DIRECTORY,
-                                       _WORKDIR.value, 'workdir')
+    # Add a note so that we can tell which task is which JAX host.
+    # (Depending on the platform task 0 is not guaranteed to be host 0)
+    platform.work_unit().set_task_status(
+        f"process_index: {jax.process_index()}, "
+        f"process_count: {jax.process_count()}"
+    )
+    platform.work_unit().create_artifact(
+        platform.ArtifactType.DIRECTORY, _WORKDIR.value, "workdir"
+    )
 
-  train.train_and_evaluate(_CONFIG.value, _WORKDIR.value)
+    train.train_and_evaluate(_CONFIG.value, _WORKDIR.value)
 
 
-if __name__ == '__main__':
-  flags.mark_flags_as_required(['config', 'workdir'])
-  app.run(main)
+if __name__ == "__main__":
+    flags.mark_flags_as_required(["config", "workdir"])
+    app.run(main)
