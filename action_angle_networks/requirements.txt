@@ -1,5 +1,7 @@
 jax
 flax
+distrax
+jaxopt
 numpy
 absl-py
 chex

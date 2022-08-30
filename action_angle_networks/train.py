@@ -38,7 +38,7 @@ from action_angle_networks import shm_simulation
 
 
 def get_generate_canonical_coordinates_fn(
-    config
+    config: ml_collections.ConfigDict
 ):
   """Returns a function that creates trajectories of shape [num_samples, num_trajectories]."""
   if config.simulation == 'shm':
@@ -68,7 +68,7 @@ def get_generate_canonical_coordinates_fn(
 
 
 def get_compute_hamiltonian_fn(
-    config
+    config: ml_collections.ConfigDict
 ):
   """Returns a function that computes the Hamiltonian over trajectories of shape [num_samples, num_trajectories]."""
   if config.simulation == 'shm':
@@ -87,7 +87,7 @@ def get_compute_hamiltonian_fn(
 
 
 def create_masked_coupling_flow(
-    config,
+    config: ml_collections.ConfigDict,
     init_shape):
   """Builds the normalizing flow model."""
   # Number of parameters for the rational-quadratic spline:
@@ -120,7 +120,7 @@ def create_masked_coupling_flow(
       conditioners=conditioners)
 
 
-def create_pointwise_flow(config,
+def create_pointwise_flow(config: ml_collections.ConfigDict,
                           init_shape):
   """Builds the pointwise normalizing flow model."""
   activation = models.create_activation_bijector(config.activation)
@@ -131,7 +131,7 @@ def create_pointwise_flow(config,
       base_flow=base_flow, base_flow_input_dims=base_flow_input_dims)
 
 
-def create_shear_flow(config,
+def create_shear_flow(config: ml_collections.ConfigDict,
                       init_shape):
   """Builds the shear normalizing flow model."""
   linear_input_dims = conditioner_input_dims = init_shape[-1] // 2
@@ -150,7 +150,7 @@ def create_shear_flow(config,
   return models.SequentialFlow(flows)
 
 
-def create_flow(config,
+def create_flow(config: ml_collections.ConfigDict,
                 init_shape):
   """Creates the flow model."""
   if config.flow_type == 'shear':
@@ -162,7 +162,7 @@ def create_flow(config,
   raise ValueError(f'Unsupported flow type: {config.flow_type}.')
 
 
-def create_scaler(config):
+def create_scaler(config: ml_collections.ConfigDict):
   """Constructs the scaler."""
   if config.scaler == 'standard':
     return scalers.StandardScaler()
@@ -171,7 +171,7 @@ def create_scaler(config):
   raise ValueError(f'Unsupported scaler: {config.scaler}.')
 
 
-def create_model(config):
+def create_model(config: ml_collections.ConfigDict):
   """Creates the model."""
   activation = getattr(jax.nn, config.activation, None)
   latent_size = config.latent_size
@@ -243,7 +243,7 @@ def create_model(config):
 
 
 def create_train_state(
-    config, rng,
+    config: ml_collections.ConfigDict, rng,
     init_samples):
   """Creates the training state."""
   model = create_model(config)
@@ -255,7 +255,7 @@ def create_train_state(
 
 @jax.jit
 def compute_predictions(
-    state, positions, momentums,
+    state, positions: chex.Array, momentums: chex.Array,
     time_deltas):
   """Computes model predictions."""
   return state.apply_fn(state.params, positions, momentums, time_deltas)
@@ -548,7 +548,7 @@ def get_coordinates_for_time_jumps(
 
 
 def get_coordinates_fn(
-    config
+    config: ml_collections.ConfigDict
 ):
   """Returns a function that sets up coordinates."""
   # Setup for one-step predictions.
@@ -579,7 +579,7 @@ def sample_time_jump_with_linear_increase(step, num_train_steps,
 
 
 def get_time_deltas_fn(
-    config):
+    config: ml_collections.ConfigDict):
   """Returns a function that sets up time deltas."""
   # Setup for one-step predictions.
   if config.single_step_predictions:
@@ -600,7 +600,7 @@ def get_trajectory_with_parameters(
 
 
 def train_and_evaluate(
-    config, workdir
+    config: ml_collections.ConfigDict, workdir: str
 ):
   """Performs training and evaluation with the given configuration."""
   # Set up logging.
