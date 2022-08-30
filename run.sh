@@ -16,8 +16,8 @@
 set -e
 set -x
 
-python3 -m venv .
-source ./bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 
-pip install -r action_angle_networks/requirements.txt
+pip install -r requirements.txt
 python -m action_angle_networks.train_test

@@ -3,6 +3,6 @@ flax
 distrax
 jaxopt
 numpy
-absl - py
+absl-py
 chex
 ml_collections
