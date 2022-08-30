@@ -15,15 +15,15 @@
 
 """Simulation of simple harmonic motion."""
 
-from typing import Mapping, Sequence, Tuple, Optional
+from typing import Mapping, Optional, Sequence, Tuple
 
 import chex
 import jax
 import jax.numpy as jnp
-from matplotlib import animation
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib import animation
 
 
 def generate_canonical_coordinates(

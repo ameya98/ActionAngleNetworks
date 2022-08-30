@@ -15,14 +15,14 @@
 
 """Simulation of coupled harmonic motion."""
 
-from typing import Mapping, Optional, Dict, Tuple
+from typing import Dict, Mapping, Optional, Tuple
 
 import chex
 import jax
 import jax.numpy as jnp
-from matplotlib import animation
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib import animation
 
 
 def sample_simulation_parameters(

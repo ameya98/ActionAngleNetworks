@@ -16,13 +16,12 @@
 """Main entry point for running the training pipeline."""
 
 from typing import Sequence
-from absl import app
-from absl import flags
-from absl import logging
-from clu import platform
+
 import jax
-from ml_collections import config_flags
 import tensorflow as tf
+from absl import app, flags, logging
+from clu import platform
+from ml_collections import config_flags
 
 from action_angle_networks import train
 

@@ -23,9 +23,9 @@ import distrax
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
+import ml_collections
 import numpy as np
 import optax
-import ml_collections
 
 
 @jax.jit

@@ -17,9 +17,9 @@
 
 from typing import Sequence
 
-from absl.testing import absltest
-from absl.testing import parameterized
 import numpy as np
+
+from absl.testing import absltest, parameterized
 
 from action_angle_networks import scalers
 

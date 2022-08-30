@@ -17,13 +17,14 @@
 
 import tempfile
 
-from absl.testing import absltest
-from absl.testing import parameterized
+from absl.testing import absltest, parameterized
 
 from action_angle_networks import train
-from action_angle_networks.configs.harmonic_motion import action_angle_flow
-from action_angle_networks.configs.harmonic_motion import action_angle_mlp
-from action_angle_networks.configs.harmonic_motion import euler_update
+from action_angle_networks.configs.harmonic_motion import (
+    action_angle_flow,
+    action_angle_mlp,
+    euler_update,
+)
 
 _ALL_CONFIGS = {
     "action_angle_flow": action_angle_flow.get_config(),

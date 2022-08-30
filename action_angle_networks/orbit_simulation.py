@@ -15,7 +15,7 @@
 
 """Simulation of Keplerian orbits."""
 
-from typing import Mapping, Tuple, Dict
+from typing import Dict, Mapping, Tuple
 
 import chex
 import jax
@@ -24,7 +24,7 @@ import jaxopt
 
 
 def sample_simulation_parameters(
-    simulation_parameter_ranges: Mapping[str, Tuple[float, float]],
+    simulation_parameter_ranges: Mapping[str, Tuple[chex.Numeric, chex.Numeric]],
     num_trajectories: int,
     rng: chex.PRNGKey,
 ) -> Dict[str, chex.Array]:
@@ -61,7 +61,11 @@ def sample_simulation_parameters(
     )
 
 
-def generate_canonical_coordinates(t, simulation_parameters, check_convergence=False):
+def generate_canonical_coordinates(
+    t: chex.Numeric,
+    simulation_parameters: Mapping[str, chex.Array],
+    check_convergence: bool = False,
+):
     """Generates positions and momentums in polar coordinates."""
 
     def eccentric_anomaly_to_time(eccentric_anomaly):
@@ -111,14 +115,22 @@ def generate_canonical_coordinates(t, simulation_parameters, check_convergence=F
     return position, momentum
 
 
-def compute_angular_momentum(position, momentum, simulation_parameters):
+def compute_angular_momentum(
+    position: chex.Array,
+    momentum: chex.Array,
+    simulation_parameters: Dict[str, chex.Array],
+) -> chex.Array:
     """Computes the angular momentum at these coordinates."""
     del position, simulation_parameters
     p_phi = momentum[1]
     return p_phi
 
 
-def compute_hamiltonian(position, momentum, simulation_parameters):
+def compute_hamiltonian(
+    position: chex.Array,
+    momentum: chex.Array,
+    simulation_parameters: Dict[str, chex.Array],
+) -> chex.Array:
     """Computes the Hamiltonian at these coordinates."""
     m, k = simulation_parameters["m"], simulation_parameters["k"]
     r = position[0]
@@ -126,7 +138,11 @@ def compute_hamiltonian(position, momentum, simulation_parameters):
     return (p_r**2) / (2 * m) + (p_phi**2) / (2 * m * (r**2)) - k / r
 
 
-def polar_to_cartesian(position, momentum, simulation_parameters):
+def polar_to_cartesian(
+    position: chex.Array,
+    momentum: chex.Array,
+    simulation_parameters: Dict[str, chex.Array],
+) -> Tuple[chex.Array, chex.Array]:
     """Converts positions and momentums from polar to Cartesian coordinates."""
     m = simulation_parameters["m"]
     r, phi = position

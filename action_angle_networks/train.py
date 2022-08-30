@@ -15,27 +15,27 @@
 
 """Training code."""
 
-from ast import Call
 import functools
 import logging
+import os
 from typing import Callable, Dict, Optional, Tuple
 
 import chex
-from clu import metric_writers
-from clu import parameter_overview
-import distrax
 import flax.linen as nn
-from flax.training import train_state
 import jax
 import jax.numpy as jnp
 import ml_collections
 import optax
+from clu import checkpoint, metric_writers, parameter_overview
+from flax.training import train_state
 
-from action_angle_networks import harmonic_motion_simulation
-from action_angle_networks import models
-from action_angle_networks import orbit_simulation
-from action_angle_networks import scalers
-from action_angle_networks import shm_simulation
+from action_angle_networks import (
+    harmonic_motion_simulation,
+    models,
+    orbit_simulation,
+    scalers,
+    shm_simulation,
+)
 
 
 def get_generate_canonical_coordinates_fn(
@@ -552,9 +552,7 @@ def sample_time_jump_with_linear_increase(
     max_jump: int,
 ) -> int:
     """Returns a stochastic jump size, with linearly increasing mean."""
-    max_time_jump_for_step = min_jump + (step / (num_train_steps - 1)) * (
-        max_jump - min_jump
-    )
+    max_time_jump_for_step = min_jump + (step / num_train_steps) * (max_jump - min_jump)
     max_time_jump_for_step = jnp.round(max_time_jump_for_step)
     jump = jax.random.randint(rng, (), min_jump, max_time_jump_for_step + 1)
     jump = int(jump)
@@ -677,11 +675,19 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
     # Setup sampling for time jumps.
     sample_time_jump_fn = get_sample_time_jump_fn(config)
 
+    # Set up checkpointing of the model.
+    # The input pipeline cannot be checkpointed in its current form,
+    # due to the use of stateful operations.
+    checkpoint_dir = os.path.join(workdir, "checkpoints")
+    ckpt = checkpoint.Checkpoint(checkpoint_dir, max_to_keep=2)
+    state = ckpt.restore_or_initialize(state)
+    initial_step = int(state.step) + 1
+
     min_train_loss = jnp.inf
     all_train_metrics = {}
     all_test_metrics = {}
 
-    for step in range(num_train_steps):
+    for step in range(initial_step, num_train_steps + 1):
         step_rng = jax.random.fold_in(rng, step)
 
         # Sample time jump.
@@ -761,6 +767,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
             if train_metrics["total_loss"] < min_train_loss:
                 min_train_loss = train_metrics["total_loss"]
                 best_state = state
+                ckpt.save(best_state)
 
     auxiliary_data = {
         "train": {
