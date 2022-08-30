@@ -27,15 +27,15 @@ class Scaler(abc.ABC):
     """Abstract base class for scalers."""
 
     @abc.abstractmethod
-    def fit(self, data):
+    def fit(self, data: chex.Array) -> "Scaler":
         pass
 
     @abc.abstractmethod
-    def transform(self, data):
+    def transform(self, data: chex.Array) -> chex.Array:
         pass
 
     @abc.abstractmethod
-    def inverse_transform(self, data):
+    def inverse_transform(self, data: chex.Array) -> chex.Array:
         pass
 
 
@@ -43,20 +43,21 @@ class Scaler(abc.ABC):
 class IdentityScaler(Scaler):
     """Implements the identity scaler."""
 
-    def fit(self, data):
+    def fit(self, data: chex.Array) -> "IdentityScaler":
+        del data
         return IdentityScaler()
 
-    def transform(self, data):
+    def transform(self, data: chex.Array) -> chex.Array:
         return data
 
-    def inverse_transform(self, data):
+    def inverse_transform(self, data: chex.Array) -> chex.Array:
         return data
 
-    def tree_flatten(self):
+    def tree_flatten(self) -> Tuple[Tuple[()], None]:
         return ((), None)
 
     @classmethod
-    def tree_unflatten(cls, aux_data, children):
+    def tree_unflatten(cls, aux_data: None, children: Tuple[()]) -> "IdentityScaler":
         del aux_data, children
         return cls()
 
@@ -65,34 +66,37 @@ class IdentityScaler(Scaler):
 class StandardScaler(Scaler):
     """Implements sklearn.preprocessing.StandardScaler."""
 
-    def __init__(self, mean=None, std=None):
+    def __init__(
+        self, mean: Optional[chex.Array] = None, std: Optional[chex.Array] = None
+    ):
         super(StandardScaler, self).__init__()
         self._mean = mean
         self._std = std
 
-    def fit(self, data):
+    def fit(self, data: chex.Array) -> "StandardScaler":
         mean = jnp.mean(data, axis=0, keepdims=True)
         std = jnp.std(data, axis=0, keepdims=True)
         return StandardScaler(mean, std)
 
-    def transform(self, data):
+    def transform(self, data: chex.Array) -> chex.Array:
         return (data - self.mean()) / self.std()
 
-    def inverse_transform(self, data):
+    def inverse_transform(self, data: chex.Array) -> chex.Array:
         return data * self.std() + self.mean()
 
-    def mean(self):
+    def mean(self) -> chex.Array:
         return self._mean
 
-    def std(self):
+    def std(self) -> chex.Array:
         return self._std
 
-    def tree_flatten(self):
+    def tree_flatten(self) -> Tuple[Tuple[chex.Array, chex.Array], None]:
         children = (self.mean(), self.std())
-        aux_data = None
-        return (children, aux_data)
+        return (children, None)
 
     @classmethod
-    def tree_unflatten(cls, aux_data, children):
+    def tree_unflatten(
+        cls, aux_data: None, children: Tuple[chex.Array, chex.Array]
+    ) -> "StandardScaler":
         del aux_data
         return cls(*children)

@@ -39,7 +39,13 @@ class TrainTest(parameterized.TestCase):
             "std": [4.0, 1.0, 1.0],
         },
     )
-    def test_standard_scaler(self, arr, arr_scaled, mean, std):
+    def test_standard_scaler(
+        self,
+        arr: Sequence[Sequence[float]],
+        arr_scaled: Sequence[Sequence[float]],
+        mean: Sequence[float],
+        std: Sequence[float],
+    ):
         arr = np.asarray(arr)
         arr_scaled = np.asarray(arr_scaled)
 
@@ -62,7 +68,9 @@ class TrainTest(parameterized.TestCase):
             "arr_scaled": [[11.0, 2.0, 3.0], [3.0, 4.0, 5.0]],
         },
     )
-    def test_identity_scaler(self, arr, arr_scaled):
+    def test_identity_scaler(
+        self, arr: Sequence[Sequence[float]], arr_scaled: Sequence[Sequence[float]]
+    ):
         arr = np.asarray(arr)
         arr_scaled = np.asarray(arr_scaled)
 
