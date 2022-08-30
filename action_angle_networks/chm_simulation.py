@@ -97,7 +97,7 @@ def compute_hamiltonian(
     position: chex.Array,
     momentum: chex.Array,
     simulation_parameters: Mapping[str, chex.Array],
-):
+) -> chex.Array:
     """Computes the Hamiltonian at the given coordinates."""
     m, k_wall, k_pair = (
         simulation_parameters["m"],
@@ -120,7 +120,7 @@ def plot_coordinates(
     momentums: chex.Array,
     simulation_parameters: Mapping[str, chex.Array],
     title: str,
-):
+) -> animation.FuncAnimation:
     """Plots coordinates in the canonical basis."""
     assert len(positions) == len(momentums)
 
@@ -230,7 +230,7 @@ def plot_coordinates_in_phase_space(
     momentums: chex.Array,
     simulation_parameters: Mapping[str, chex.Array],
     title: str,
-):
+) -> animation.FuncAnimation:
     """Plots a phase space diagram of the given coordinates."""
     assert len(positions) == len(momentums)
 
@@ -336,8 +336,14 @@ def plot_coordinates_in_phase_space(
 
 
 def static_plot_coordinates_in_phase_space(
-    positions, momentums, title, fig=None, ax=None, max_position=None, max_momentum=None
-):
+    positions: chex.Array,
+    momentums: chex.Array,
+    title: str,
+    fig: Optional[plt.Figure] = None,
+    ax: Optional[plt.Axes] = None,
+    max_position: Optional[chex.Numeric] = None,
+    max_momentum: Optional[chex.Numeric] = None,
+) -> plt.Figure:
     """Plots a static phase space diagram of the given coordinates."""
     assert len(positions) == len(momentums)
 

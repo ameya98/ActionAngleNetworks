@@ -15,6 +15,7 @@
 
 """Training code."""
 
+from ast import Call
 import functools
 import logging
 from typing import Callable, Dict, Mapping, Optional, Tuple, Union
@@ -37,7 +38,9 @@ from action_angle_networks import scalers
 from action_angle_networks import shm_simulation
 
 
-def get_generate_canonical_coordinates_fn(config: ml_collections.ConfigDict):
+def get_generate_canonical_coordinates_fn(
+    config: ml_collections.ConfigDict,
+) -> Callable[[chex.Array, Dict[str, chex.Array]], Tuple[chex.Array, chex.Array]]:
     """Returns a function that creates trajectories of shape [num_samples, num_trajectories]."""
     if config.simulation == "shm":
         return jax.jit(
@@ -71,7 +74,9 @@ def get_generate_canonical_coordinates_fn(config: ml_collections.ConfigDict):
     raise ValueError("Unsupported simulation: {config.simulation}.")
 
 
-def get_compute_hamiltonian_fn(config: ml_collections.ConfigDict):
+def get_compute_hamiltonian_fn(
+    config: ml_collections.ConfigDict,
+) -> Callable[[chex.Array, chex.Array, Dict[str, chex.Array]], chex.Array]:
     """Returns a function that computes the Hamiltonian over trajectories of shape [num_samples, num_trajectories]."""
     if config.simulation == "shm":
         return jax.jit(
@@ -92,7 +97,7 @@ def get_compute_hamiltonian_fn(config: ml_collections.ConfigDict):
 
 
 def create_scaler(config: ml_collections.ConfigDict) -> scalers.Scaler:
-    """Constructs the scaler."""
+    """Constructs the scaler for normalizing the data."""
     if config.scaler == "standard":
         return scalers.StandardScaler()
     if config.scaler == "identity":
@@ -177,7 +182,9 @@ def create_model(config: ml_collections.ConfigDict):
 
 
 def create_train_state(
-    config: ml_collections.ConfigDict, rng, init_samples
+    config: ml_collections.ConfigDict,
+    rng: chex.PRNGKey,
+    init_samples: chex.Array,
 ) -> train_state.TrainState:
     """Creates the training state."""
     model = create_model(config)
@@ -191,21 +198,21 @@ def compute_predictions(
     state: train_state.TrainState,
     positions: chex.Array,
     momentums: chex.Array,
-    time_deltas,
-):
+    time_deltas: chex.Numeric,
+) -> Tuple[chex.Array, chex.Array, Optional[Dict[str, chex.Array]]]:
     """Computes model predictions."""
     return state.apply_fn(state.params, positions, momentums, time_deltas)
 
 
 @jax.jit
 def compute_loss(
-    predicted_positions,
-    predicted_momentums,
-    target_positions,
-    target_momentums,
-    auxiliary_predictions=None,
-    regularizations=None,
-):
+    predicted_positions: chex.Array,
+    predicted_momentums: chex.Array,
+    target_positions: chex.Array,
+    target_momentums: chex.Array,
+    auxiliary_predictions: Optional[Dict[str, chex.Array]] = None,
+    regularizations: Optional[Dict[str, chex.Array]] = None,
+) -> chex.Numeric:
     """Computes the loss for the given predictions."""
     assert (
         predicted_positions.shape == target_positions.shape
@@ -231,15 +238,15 @@ def compute_loss(
 
 @jax.jit
 def compute_updates(
-    state,
-    positions,
-    momentums,
-    time_deltas,
-    target_positions,
-    target_momentums,
-    regularizations,
-    compute_encoded_decoded_loss=False,
-):
+    state: train_state.TrainState,
+    positions: chex.Array,
+    momentums: chex.Array,
+    time_deltas: chex.Numeric,
+    target_positions: chex.Array,
+    target_momentums: chex.Array,
+    regularizations: Dict[str, chex.Numeric],
+    compute_encoded_decoded_loss: bool = False,
+) -> optax.Updates:
     """Computes gradients for a single batch."""
 
     def loss_fn(params):
@@ -282,13 +289,15 @@ def compute_updates(
 
 @functools.partial(jax.jit, static_argnames="compute_hamiltonian_fn")
 def compute_mean_change_in_hamiltonians(
-    curr_positions,
-    curr_momentums,
-    predicted_positions,
-    predicted_momentums,
-    compute_hamiltonian_fn,
-    simulation_parameters,
-):
+    curr_positions: chex.Array,
+    curr_momentums: chex.Array,
+    predicted_positions: chex.Array,
+    predicted_momentums: chex.Array,
+    compute_hamiltonian_fn: Callable[
+        [chex.Array, chex.Array, Dict[str, chex.Array]], chex.Array
+    ],
+    simulation_parameters: Dict[str, chex.Array],
+) -> chex.Numeric:
     """Computes the mean change in Hamiltonian for current coordinates versus predicted coordinates."""
     curr_hamiltonians = compute_hamiltonian_fn(
         curr_positions, curr_momentums, simulation_parameters
@@ -301,18 +310,18 @@ def compute_mean_change_in_hamiltonians(
 
 @jax.jit
 def compute_metrics(
-    predicted_positions,
-    predicted_momentums,
-    target_positions,
-    target_momentums,
-    current_positions,
-    current_momentums,
-    encoded_decoded_positions,
-    encoded_decoded_momentums,
-    auxiliary_predictions,
-    regularizations,
-    compute_encoded_decoded_loss=False,
-):
+    predicted_positions: chex.Array,
+    predicted_momentums: chex.Array,
+    target_positions: chex.Array,
+    target_momentums: chex.Array,
+    current_positions: chex.Array,
+    current_momentums: chex.Array,
+    encoded_decoded_positions: chex.Array,
+    encoded_decoded_momentums: chex.Array,
+    auxiliary_predictions: chex.Array,
+    regularizations: chex.Array,
+    compute_encoded_decoded_loss: bool = False,
+) -> Dict[str, chex.Numeric]:
     """Computes loss and other metrics."""
     prediction_loss = compute_loss(
         predicted_positions, predicted_momentums, target_positions, target_momentums
@@ -345,16 +354,18 @@ def compute_metrics(
 
 @functools.partial(jax.jit, static_argnames=["jump", "compute_hamiltonian_fn"])
 def compute_metrics_helper(
-    state,
-    positions,
-    momentums,
-    jump,
-    time_delta,
-    scaler,
-    compute_hamiltonian_fn,
-    simulation_parameters,
-    regularizations,
-):
+    state: train_state.TrainState,
+    positions: chex.Array,
+    momentums: chex.Array,
+    jump: int,
+    time_delta: float,
+    scaler: scalers.Scaler,
+    compute_hamiltonian_fn: Callable[
+        [chex.Array, chex.Array, Dict[str, chex.Array]], chex.Array
+    ],
+    simulation_parameters: Dict[str, chex.Array],
+    regularizations: Dict[str, float],
+) -> Dict[str, chex.Numeric]:
     """Helper for compute_metrics that evaluates the current training state."""
     (
         curr_positions,
@@ -402,7 +413,12 @@ def compute_metrics_helper(
     return metrics
 
 
-def log_metrics(step, metrics, summary_writer, prefix=""):
+def log_metrics(
+    step: int,
+    metrics: Dict[str, float],
+    summary_writer: metric_writers.MetricWriter,
+    prefix: str = "",
+) -> None:
     """Logs all metrics."""
     # Formatting for accuracy.
     for metric in metrics:
@@ -420,11 +436,13 @@ def log_metrics(step, metrics, summary_writer, prefix=""):
 
 
 @jax.jit
-def fit_scaler(positions, momentums, scaler):
+def fit_scaler(
+    positions: chex.Array, momentums: chex.Array, scaler: scalers.Scaler
+) -> scalers.Scaler:
     """Fits the scaler."""
     if positions.ndim == 1:
-        positions = positions[jnp.newaxis, Ellipsis]
-        momentums = momentums[jnp.newaxis, Ellipsis]
+        positions = positions[jnp.newaxis, ...]
+        momentums = momentums[jnp.newaxis, ...]
 
     assert positions.ndim == 2, f"Got positions of shape {positions.shape}."
     assert momentums.ndim == 2, f"Got momentums of shape {momentums.shape}."
@@ -434,11 +452,13 @@ def fit_scaler(positions, momentums, scaler):
 
 
 @jax.jit
-def transform_with_scaler(positions, momentums, scaler):
+def transform_with_scaler(
+    positions: chex.Array, momentums: chex.Array, scaler: scalers.Scaler
+) -> Tuple[chex.Array, chex.Array]:
     """Performs the rescaling to normalized coordinates."""
     if positions.ndim == 1:
-        positions = positions[jnp.newaxis, Ellipsis]
-        momentums = momentums[jnp.newaxis, Ellipsis]
+        positions = positions[jnp.newaxis, ...]
+        momentums = momentums[jnp.newaxis, ...]
 
     assert positions.ndim == 2, f"Got positions of shape {positions.shape}."
     assert momentums.ndim == 2, f"Got momentums of shape {momentums.shape}."
@@ -452,11 +472,13 @@ def transform_with_scaler(positions, momentums, scaler):
 
 
 @jax.jit
-def inverse_transform_with_scaler(positions, momentums, scaler):
+def inverse_transform_with_scaler(
+    positions: chex.Array, momentums: chex.Array, scaler: scalers.Scaler
+) -> Tuple[chex.Array, chex.Array]:
     """Performs the inverse rescaling to unnormalized coordinates."""
     if positions.ndim == 1:
-        positions = positions[jnp.newaxis, Ellipsis]
-        momentums = momentums[jnp.newaxis, Ellipsis]
+        positions = positions[jnp.newaxis, ...]
+        momentums = momentums[jnp.newaxis, ...]
 
     assert positions.ndim == 2, f"Got positions of shape {positions.shape}."
     assert momentums.ndim == 2, f"Got momentums of shape {momentums.shape}."
@@ -470,7 +492,11 @@ def inverse_transform_with_scaler(positions, momentums, scaler):
 
 
 @functools.partial(jax.jit, static_argnames="num_trajectories")
-def sample_simulation_parameters(simulation_parameter_ranges, num_trajectories, rng):
+def sample_simulation_parameters(
+    simulation_parameter_ranges: Dict[str, Tuple[float, float]],
+    num_trajectories: int,
+    rng: chex.PRNGKey,
+) -> Dict[str, chex.Array]:
     """Samples simulation parameters."""
 
     is_tuple = lambda val: isinstance(val, tuple)
@@ -497,7 +523,9 @@ def sample_simulation_parameters(simulation_parameter_ranges, num_trajectories, 
 
 
 @functools.partial(jax.jit, static_argnames="jump")
-def get_coordinates_for_time_jump(positions, momentums, jump):
+def get_coordinates_for_time_jump(
+    positions: chex.Array, momentums: chex.Array, jump: int
+) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array]:
     """Returns the current and target coordinates for the given jump."""
     # Input arrays are of shape [num_samples, num_trajectories].
     assert positions.ndim == 2, f"Got positions of shape {positions.shape}."
@@ -509,7 +537,9 @@ def get_coordinates_for_time_jump(positions, momentums, jump):
 
 
 @functools.partial(jax.jit, static_argnames="max_jump")
-def get_coordinates_for_time_jumps(positions, momentums, max_jump):
+def get_coordinates_for_time_jumps(
+    positions: chex.Array, momentums: chex.Array, max_jump: int
+) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array]:
     """Returns the current and target coordinates for jumps upto max_jump."""
     # Input arrays are of shape [num_samples, num_trajectories].
     assert positions.ndim == 2, f"Got positions of shape {positions.shape}."
@@ -528,7 +558,11 @@ def get_coordinates_for_time_jumps(positions, momentums, max_jump):
     return curr_positions, curr_momentums, target_positions, target_momentums
 
 
-def get_coordinates_fn(config: ml_collections.ConfigDict):
+def get_coordinates_fn(
+    config: ml_collections.ConfigDict,
+) -> Callable[
+    [chex.Array, chex.Array, int], Tuple[chex.Array, chex.Array, chex.Array, chex.Array]
+]:
     """Returns a function that sets up coordinates."""
     # Setup for one-step predictions.
     if config.single_step_predictions:
@@ -538,15 +572,19 @@ def get_coordinates_fn(config: ml_collections.ConfigDict):
     return get_coordinates_for_time_jumps
 
 
-def sample_constant_time_jump(step, constant_jump, rng):
+def sample_constant_time_jump(step: int, constant_jump: int, rng: chex.PRNGKey) -> int:
     """Returns a constant jump size."""
     del step, rng
     return constant_jump
 
 
 def sample_time_jump_with_linear_increase(
-    step, num_train_steps, min_jump, max_jump, rng
-):
+    step: int,
+    num_train_steps: int,
+    min_jump: int,
+    max_jump: int,
+    rng: chex.PRNGKey,
+) -> int:
     """Returns a stochastic jump size, with linearly increasing mean."""
     max_time_jump_for_step = min_jump + (step / (num_train_steps - 1)) * (
         max_jump - min_jump
@@ -557,7 +595,7 @@ def sample_time_jump_with_linear_increase(
     return jump
 
 
-def get_time_deltas_fn(config: ml_collections.ConfigDict):
+def get_time_deltas_fn(config: ml_collections.ConfigDict) -> Callable[[int], float]:
     """Returns a function that sets up time deltas."""
     # Setup for one-step predictions.
     if config.single_step_predictions:
@@ -568,7 +606,12 @@ def get_time_deltas_fn(config: ml_collections.ConfigDict):
 
 
 @functools.partial(jax.jit, static_argnames="index")
-def get_trajectory_with_parameters(index, positions, momentums, simulation_parameters):
+def get_trajectory_with_parameters(
+    index: int,
+    positions: chex.Array,
+    momentums: chex.Array,
+    simulation_parameters: Dict[str, chex.Array],
+) -> Tuple[chex.Array, chex.Array, Dict[str, chex.Array]]:
     """Gets the trajectory and simulation parameters for a particular index."""
     return jax.tree_map(
         lambda arr: arr[index], (positions, momentums, simulation_parameters)
