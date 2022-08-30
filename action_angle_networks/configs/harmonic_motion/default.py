@@ -22,7 +22,7 @@ def get_config() -> ml_collections.ConfigDict:
     """Returns a training configuration."""
     config = ml_collections.ConfigDict()
     config.rng_seed = 0
-    config.num_trajectories = 1
+    config.num_trajectories = 2
     config.single_step_predictions = True
     config.num_samples = 1000
     config.split_on = "times"

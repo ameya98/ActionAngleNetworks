@@ -677,18 +677,16 @@ def train_and_evaluate(
     sample_time_jump_fn = get_sample_time_jump_fn(config)
 
     # Set up checkpointing of the model.
-    # The input pipeline cannot be checkpointed in its current form,
-    # due to the use of stateful operations.
     checkpoint_dir = os.path.join(workdir, "checkpoints")
     ckpt = checkpoint.Checkpoint(checkpoint_dir, max_to_keep=2)
     state = ckpt.restore_or_initialize(state)
-    initial_step = int(state.step) + 1
+    initial_step = int(state.step)
 
     min_train_loss = jnp.inf
     all_train_metrics = {}
     all_test_metrics = {}
 
-    for step in range(initial_step, num_train_steps + 1):
+    for step in range(initial_step, num_train_steps):
         step_rng = jax.random.fold_in(rng, step)
 
         # Sample time jump.
