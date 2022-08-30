@@ -21,9 +21,9 @@ from absl.testing import absltest
 from absl.testing import parameterized
 
 from action_angle_networks import train
-from action_angle_networks.configs import action_angle_flow
-from action_angle_networks.configs import action_angle_mlp
-from action_angle_networks.configs import euler_update
+from action_angle_networks.configs.harmonic_motion import action_angle_flow
+from action_angle_networks.configs.harmonic_motion import action_angle_mlp
+from action_angle_networks.configs.harmonic_motion import euler_update
 
 _ALL_CONFIGS = {
     "action_angle_flow": action_angle_flow.get_config(),
@@ -34,7 +34,7 @@ _ALL_CONFIGS = {
 
 class TrainTest(parameterized.TestCase):
     @parameterized.parameters("action_angle_flow", "action_angle_mlp", "euler_update")
-    def test_train_and_evaluate(self, config_name):
+    def test_train_and_evaluate(self, config_name: str):
         # Load config.
         config = _ALL_CONFIGS[config_name]
         config.num_train_steps = 5

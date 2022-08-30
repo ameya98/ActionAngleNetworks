@@ -18,7 +18,7 @@
 from ast import Call
 import functools
 import logging
-from typing import Callable, Dict, Mapping, Optional, Tuple, Union
+from typing import Callable, Dict, Optional, Tuple
 
 import chex
 from clu import metric_writers
@@ -31,7 +31,7 @@ import jax.numpy as jnp
 import ml_collections
 import optax
 
-from action_angle_networks import chm_simulation
+from action_angle_networks import harmonic_motion_simulation
 from action_angle_networks import models
 from action_angle_networks import orbit_simulation
 from action_angle_networks import scalers
@@ -42,21 +42,10 @@ def get_generate_canonical_coordinates_fn(
     config: ml_collections.ConfigDict,
 ) -> Callable[[chex.Array, Dict[str, chex.Array]], Tuple[chex.Array, chex.Array]]:
     """Returns a function that creates trajectories of shape [num_samples, num_trajectories]."""
-    if config.simulation == "shm":
+    if config.simulation == "harmonic":
         return jax.jit(
             jax.vmap(
-                jax.vmap(
-                    shm_simulation.generate_canonical_coordinates, in_axes=(0, None)
-                ),
-                in_axes=(None, 0),
-                out_axes=1,
-            )
-        )
-
-    if config.simulation == "chm":
-        return jax.jit(
-            jax.vmap(
-                chm_simulation.generate_canonical_coordinates,
+                harmonic_motion_simulation.generate_canonical_coordinates,
                 in_axes=(0, None),
                 out_axes=0,
             )
@@ -71,21 +60,18 @@ def get_generate_canonical_coordinates_fn(
             )
         )
 
-    raise ValueError("Unsupported simulation: {config.simulation}.")
+    raise ValueError(f"Unsupported simulation: {config.simulation}.")
 
 
 def get_compute_hamiltonian_fn(
     config: ml_collections.ConfigDict,
 ) -> Callable[[chex.Array, chex.Array, Dict[str, chex.Array]], chex.Array]:
     """Returns a function that computes the Hamiltonian over trajectories of shape [num_samples, num_trajectories]."""
-    if config.simulation == "shm":
+    if config.simulation == "harmonic":
         return jax.jit(
-            jax.vmap(shm_simulation.compute_hamiltonian, in_axes=(0, 0, None))
-        )
-
-    if config.simulation == "chm":
-        return jax.jit(
-            jax.vmap(chm_simulation.compute_hamiltonian, in_axes=(0, 0, None))
+            jax.vmap(
+                harmonic_motion_simulation.compute_hamiltonian, in_axes=(0, 0, None)
+            )
         )
 
     if config.simulation == "orbit":
@@ -93,7 +79,18 @@ def get_compute_hamiltonian_fn(
             jax.vmap(orbit_simulation.compute_hamiltonian, in_axes=(0, 0, None))
         )
 
-    raise ValueError("Unsupported simulation: {config.simulation}.")
+    raise ValueError(f"Unsupported simulation: {config.simulation}.")
+
+
+def get_sample_simulation_parameters_fn(config: ml_collections.ConfigDict):
+    """Returns a function that samples simulation parameters."""
+    if config.simulation == "harmonic":
+        return harmonic_motion_simulation.sample_simulation_parameters
+
+    if config.simulation == "orbit":
+        return orbit_simulation.sample_simulation_parameters
+
+    raise ValueError(f"Unsupported simulation: {config.simulation}.")
 
 
 def create_scaler(config: ml_collections.ConfigDict) -> scalers.Scaler:
@@ -491,37 +488,6 @@ def inverse_transform_with_scaler(
     return positions, momentums
 
 
-@functools.partial(jax.jit, static_argnames="num_trajectories")
-def sample_simulation_parameters(
-    simulation_parameter_ranges: Dict[str, Tuple[float, float]],
-    num_trajectories: int,
-    rng: chex.PRNGKey,
-) -> Dict[str, chex.Array]:
-    """Samples simulation parameters."""
-
-    is_tuple = lambda val: isinstance(val, tuple)
-    ranges_flat, ranges_treedef = jax.tree_flatten(
-        simulation_parameter_ranges, is_leaf=is_tuple
-    )
-    rng, shuffle_rng, *rngs = jax.random.split(rng, len(ranges_flat) + 2)
-    shuffle_indices = jax.random.permutation(shuffle_rng, num_trajectories)
-    rng_tree = jax.tree_unflatten(ranges_treedef, rngs)
-
-    def sample_simulation_parameter(simulation_parameter_range, parameter_rng):
-        """Sample a single simulation parameter."""
-        del parameter_rng
-        minval, maxval = simulation_parameter_range
-        samples = jnp.linspace(minval, maxval, num=num_trajectories)
-        return jnp.sort(samples)[shuffle_indices]
-
-    return jax.tree_map(
-        sample_simulation_parameter,
-        simulation_parameter_ranges,
-        rng_tree,
-        is_leaf=is_tuple,
-    )
-
-
 @functools.partial(jax.jit, static_argnames="jump")
 def get_coordinates_for_time_jump(
     positions: chex.Array, momentums: chex.Array, jump: int
@@ -572,7 +538,7 @@ def get_coordinates_fn(
     return get_coordinates_for_time_jumps
 
 
-def sample_constant_time_jump(step: int, constant_jump: int, rng: chex.PRNGKey) -> int:
+def sample_constant_time_jump(step: int, rng: chex.PRNGKey, constant_jump: int) -> int:
     """Returns a constant jump size."""
     del step, rng
     return constant_jump
@@ -580,10 +546,10 @@ def sample_constant_time_jump(step: int, constant_jump: int, rng: chex.PRNGKey) 
 
 def sample_time_jump_with_linear_increase(
     step: int,
+    rng: chex.PRNGKey,
     num_train_steps: int,
     min_jump: int,
     max_jump: int,
-    rng: chex.PRNGKey,
 ) -> int:
     """Returns a stochastic jump size, with linearly increasing mean."""
     max_time_jump_for_step = min_jump + (step / (num_train_steps - 1)) * (
@@ -593,6 +559,29 @@ def sample_time_jump_with_linear_increase(
     jump = jax.random.randint(rng, (), min_jump, max_time_jump_for_step + 1)
     jump = int(jump)
     return jump
+
+
+def get_sample_time_jump_fn(
+    config: ml_collections.ConfigDict,
+) -> Callable[[int, chex.PRNGKey], int]:
+    if config.train_time_jump_schedule == "constant":
+        return functools.partial(
+            sample_constant_time_jump,
+            constant_jump=config.train_time_jump,
+        )
+
+    if config.train_time_jump_schedule == "linear":
+        min_jump, max_jump = config.train_time_jump_range
+        return functools.partial(
+            sample_time_jump_with_linear_increase,
+            min_jump=min_jump,
+            max_jump=max_jump,
+            num_train_steps=config.num_train_steps,
+        )
+
+    raise ValueError(
+        f"Unsupported config.time_jump_schedule: {config.time_jump_schedule}"
+    )
 
 
 def get_time_deltas_fn(config: ml_collections.ConfigDict) -> Callable[[int], float]:
@@ -625,7 +614,6 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
     summary_writer.write_hparams(config.to_dict())
 
     time_delta = config.time_delta
-    train_time_jump_range = config.train_time_jump_range
     test_time_jumps = config.test_time_jumps
     num_trajectories = config.num_trajectories
     num_samples = config.num_samples
@@ -637,11 +625,12 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
     # Get simulation functions.
     generate_canonical_coordinates_fn = get_generate_canonical_coordinates_fn(config)
     compute_hamiltonian_fn = get_compute_hamiltonian_fn(config)
+    sample_simulation_parameters_fn = get_sample_simulation_parameters_fn(config)
 
     # Generate data.
     rng = jax.random.PRNGKey(config.rng_seed)
     rng, simulation_parameters_rng = jax.random.split(rng)
-    simulation_parameters = sample_simulation_parameters(
+    simulation_parameters = sample_simulation_parameters_fn(
         config.simulation_parameter_ranges.to_dict(),
         num_trajectories,
         simulation_parameters_rng,
@@ -686,12 +675,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
     time_deltas_fn = get_time_deltas_fn(config)
 
     # Setup sampling for time jumps.
-    sample_time_jump_fn = functools.partial(
-        sample_time_jump_with_linear_increase,
-        min_jump=train_time_jump_range[0],
-        max_jump=train_time_jump_range[1],
-        num_train_steps=num_train_steps,
-    )
+    sample_time_jump_fn = get_sample_time_jump_fn(config)
 
     min_train_loss = jnp.inf
     all_train_metrics = {}
@@ -702,7 +686,7 @@ def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
 
         # Sample time jump.
         step_rng, jump_rng = jax.random.split(step_rng)
-        jump = sample_time_jump_fn(step, rng=jump_rng)
+        jump = sample_time_jump_fn(step, jump_rng)
 
         # Setup inputs and targets on all trajectories.
         (

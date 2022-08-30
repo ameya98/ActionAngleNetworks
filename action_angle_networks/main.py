@@ -32,11 +32,11 @@ _CONFIG = config_flags.DEFINE_config_file(
     "config",
     None,
     "File path to the training hyperparameter configuration.",
-    lock_config=False,
+    lock_config=True,
 )
 
 
-def main(argv):
+def main(argv: Sequence[str]) -> None:
     if len(argv) > 1:
         raise app.UsageError("Too many command-line arguments.")
 

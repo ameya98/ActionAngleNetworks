@@ -15,11 +15,50 @@
 
 """Simulation of Keplerian orbits."""
 
-from typing import Mapping, Tuple
+from typing import Mapping, Tuple, Dict
 
 import chex
+import jax
 import jax.numpy as jnp
 import jaxopt
+
+
+def sample_simulation_parameters(
+    simulation_parameter_ranges: Mapping[str, Tuple[float, float]],
+    num_trajectories: int,
+    rng: chex.PRNGKey,
+) -> Dict[str, chex.Array]:
+    """Samples simulation parameters."""
+
+    is_tuple = lambda val: isinstance(val, tuple)
+    ranges_flat, ranges_treedef = jax.tree_flatten(
+        simulation_parameter_ranges, is_leaf=is_tuple
+    )
+    rng, shuffle_rng, *rngs = jax.random.split(rng, len(ranges_flat) + 2)
+    shuffle_indices = jax.random.permutation(shuffle_rng, num_trajectories)
+    rng_tree = jax.tree_unflatten(ranges_treedef, rngs)
+
+    def sample_simulation_parameter(
+        simulation_parameter_range: Tuple[chex.Numeric, ...],
+        parameter_rng: chex.PRNGKey,
+    ):
+        """Sample a single simulation parameter."""
+        del parameter_rng
+
+        if len(simulation_parameter_range) == 1:
+            common_value = simulation_parameter_range[0]
+            return jnp.full((num_trajectories,), common_value)
+
+        minval, maxval = simulation_parameter_range
+        samples = jnp.linspace(minval, maxval, num=num_trajectories)
+        return jnp.sort(samples)[shuffle_indices]
+
+    return jax.tree_map(
+        sample_simulation_parameter,
+        simulation_parameter_ranges,
+        rng_tree,
+        is_leaf=is_tuple,
+    )
 
 
 def generate_canonical_coordinates(t, simulation_parameters, check_convergence=False):
