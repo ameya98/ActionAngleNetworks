@@ -19,11 +19,11 @@ import abc
 from typing import Optional, Tuple
 
 import chex
-import jax
+import flax
 import jax.numpy as jnp
 
 
-class Scaler(abc.ABC):
+class Scaler(flax.struct.PyTreeNode, abc.ABC):
     """Abstract base class for scalers."""
 
     @abc.abstractmethod
@@ -39,7 +39,6 @@ class Scaler(abc.ABC):
         pass
 
 
-@jax.tree_util.register_pytree_node_class
 class IdentityScaler(Scaler):
     """Implements the identity scaler."""
 
@@ -53,25 +52,12 @@ class IdentityScaler(Scaler):
     def inverse_transform(self, data: chex.Array) -> chex.Array:
         return data
 
-    def tree_flatten(self) -> Tuple[Tuple[()], None]:
-        return ((), None)
 
-    @classmethod
-    def tree_unflatten(cls, aux_data: None, children: Tuple[()]) -> "IdentityScaler":
-        del aux_data, children
-        return cls()
-
-
-@jax.tree_util.register_pytree_node_class
 class StandardScaler(Scaler):
     """Implements sklearn.preprocessing.StandardScaler."""
 
-    def __init__(
-        self, mean: Optional[chex.Array] = None, std: Optional[chex.Array] = None
-    ):
-        super(StandardScaler, self).__init__()
-        self._mean = mean
-        self._std = std
+    _mean: Optional[chex.Array] = None
+    _std: Optional[chex.Array] = None
 
     def fit(self, data: chex.Array) -> "StandardScaler":
         mean = jnp.mean(data, axis=0, keepdims=True)
@@ -89,14 +75,3 @@ class StandardScaler(Scaler):
 
     def std(self) -> chex.Array:
         return self._std
-
-    def tree_flatten(self) -> Tuple[Tuple[chex.Array, chex.Array], None]:
-        children = (self.mean(), self.std())
-        return (children, None)
-
-    @classmethod
-    def tree_unflatten(
-        cls, aux_data: None, children: Tuple[chex.Array, chex.Array]
-    ) -> "StandardScaler":
-        del aux_data
-        return cls(*children)

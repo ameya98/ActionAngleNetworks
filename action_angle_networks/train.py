@@ -16,7 +16,6 @@
 """Training code."""
 
 import functools
-import logging
 import os
 from typing import Callable, Dict, Optional, Tuple
 
@@ -26,6 +25,8 @@ import jax
 import jax.numpy as jnp
 import ml_collections
 import optax
+
+from absl import logging
 from clu import checkpoint, metric_writers, parameter_overview
 from flax.training import train_state
 
@@ -101,7 +102,7 @@ def create_scaler(config: ml_collections.ConfigDict) -> scalers.Scaler:
     raise ValueError(f"Unsupported scaler: {config.scaler}.")
 
 
-def create_model(config: ml_collections.ConfigDict):
+def create_model(config: ml_collections.ConfigDict) -> nn.Module:
     """Creates the model."""
     activation = getattr(jax.nn, config.activation, None)
     latent_size = config.latent_size
@@ -627,6 +628,7 @@ def train_and_evaluate(
     sample_simulation_parameters_fn = get_sample_simulation_parameters_fn(config)
 
     # Generate data.
+    logging.info("Generating data.")
     rng = jax.random.PRNGKey(config.rng_seed)
     rng, simulation_parameters_rng = jax.random.split(rng)
     simulation_parameters = sample_simulation_parameters_fn(
@@ -663,6 +665,7 @@ def train_and_evaluate(
     )
 
     # Initialize model.
+    logging.info("Constructing model.")
     state = create_train_state(
         config, rng, (train_positions[:1], train_momentums[:1], time_delta)
     )
@@ -677,16 +680,18 @@ def train_and_evaluate(
     sample_time_jump_fn = get_sample_time_jump_fn(config)
 
     # Set up checkpointing of the model.
+    # We only save the model, and never load.
+    # Thus, training always begins from scratch.
     checkpoint_dir = os.path.join(workdir, "checkpoints")
     ckpt = checkpoint.Checkpoint(checkpoint_dir, max_to_keep=2)
-    state = ckpt.restore_or_initialize(state)
-    initial_step = int(state.step)
 
     min_train_loss = jnp.inf
     all_train_metrics = {}
     all_test_metrics = {}
 
-    for step in range(initial_step, num_train_steps):
+    # Start training!
+    logging.info("Starting training.")
+    for step in range(num_train_steps):
         step_rng = jax.random.fold_in(rng, step)
 
         # Sample time jump.
@@ -723,6 +728,9 @@ def train_and_evaluate(
             regularizations,
         )
         state = state.apply_gradients(grads=grads)
+
+        # Indicate that training is happening.
+        logging.log_first_n(logging.INFO, "Finished training step %d.", 10, step)
 
         # Evaluate, if required.
         is_last_step = step == num_train_steps - 1
@@ -766,7 +774,6 @@ def train_and_evaluate(
             if train_metrics["total_loss"] < min_train_loss:
                 min_train_loss = train_metrics["total_loss"]
                 best_state = state
-                ckpt.save(best_state)
 
     auxiliary_data = {
         "train": {
@@ -782,4 +789,13 @@ def train_and_evaluate(
             "metrics": all_test_metrics,
         },
     }
+
+    # Save everything we computed during training.
+    ckpt.save(
+        {
+            "scaler": scaler,
+            "best_state": best_state,
+            "auxiliary_data": auxiliary_data,
+        }
+    )
     return scaler, best_state, auxiliary_data

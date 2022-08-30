@@ -33,6 +33,6 @@ def get_config() -> ml_collections.ConfigDict:
     config.test_time_jumps = (1, 2, 5, 10, 20, 50)
     config.num_train_steps = 5000
     config.eval_cadence = 50
-    config.scaler = "identity"
+    config.scaler = "standard"
     config.simulation = "harmonic"
     return config
