@@ -34,7 +34,6 @@ from action_angle_networks import (
     models,
     orbit_simulation,
     scalers,
-    shm_simulation,
 )
 
 
@@ -605,7 +604,9 @@ def get_trajectory_with_parameters(
     )
 
 
-def train_and_evaluate(config: ml_collections.ConfigDict, workdir: str):
+def train_and_evaluate(
+    config: ml_collections.ConfigDict, workdir: str
+) -> Tuple[chex.Array, chex.Array, Dict[str, Dict[str, chex.Array]]]:
     """Performs training and evaluation with the given configuration."""
     # Set up logging.
     summary_writer = metric_writers.create_default_writer(workdir)
