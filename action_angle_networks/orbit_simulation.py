@@ -65,7 +65,7 @@ def generate_canonical_coordinates(
     t: chex.Numeric,
     simulation_parameters: Mapping[str, chex.Array],
     check_convergence: bool = False,
-):
+) -> Tuple[chex.Array, chex.Array]:
     """Generates positions and momentums in polar coordinates."""
 
     def eccentric_anomaly_to_time(eccentric_anomaly):
