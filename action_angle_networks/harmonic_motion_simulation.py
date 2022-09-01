@@ -268,6 +268,8 @@ def plot_coordinates_in_phase_space(
     momentums: chex.Array,
     simulation_parameters: Mapping[str, chex.Array],
     title: str,
+    max_position: Optional[chex.Numeric] = None,
+    max_momentum: Optional[chex.Numeric] = None,
 ) -> animation.FuncAnimation:
     """Plots a phase space diagram of the given coordinates."""
     assert len(positions) == len(momentums)
@@ -291,12 +293,20 @@ def plot_coordinates_in_phase_space(
 
     # Compute Hamiltonians.
     num_steps = qs.shape[0]
-    q_max = np.max(np.abs(qs))
-    p_max = np.max(np.abs(ps))
     hs = jax.vmap(compute_hamiltonian, in_axes=(0, 0, None))(
         qs, ps, simulation_parameters
     )
     hs_formatted = np.round(hs.squeeze(), 5)
+
+    if max_position is None:
+        q_max = np.max(np.abs(qs))
+    else:
+        q_max = max_position
+
+    if max_momentum is None:
+        p_max = np.max(np.abs(ps))
+    else:
+        p_max = max_momentum
 
     def update(t):
         # Update data
