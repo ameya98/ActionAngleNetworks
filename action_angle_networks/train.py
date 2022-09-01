@@ -181,7 +181,7 @@ def create_model(config: ml_collections.ConfigDict) -> nn.Module:
 def create_train_state(
     config: ml_collections.ConfigDict,
     rng: chex.PRNGKey,
-    init_samples: chex.Array,
+    init_samples: Tuple[chex.Array, ...],
 ) -> train_state.TrainState:
     """Creates the training state."""
     model = create_model(config)
@@ -190,7 +190,6 @@ def create_train_state(
     return train_state.TrainState.create(apply_fn=model.apply, params=params, tx=tx)
 
 
-@jax.jit
 def compute_predictions(
     state: train_state.TrainState,
     positions: chex.Array,
@@ -201,7 +200,6 @@ def compute_predictions(
     return state.apply_fn(state.params, positions, momentums, time_deltas)
 
 
-@jax.jit
 def compute_loss(
     predicted_positions: chex.Array,
     predicted_momentums: chex.Array,
@@ -305,7 +303,6 @@ def compute_mean_change_in_hamiltonians(
     return jnp.mean(jnp.abs(curr_hamiltonians - predicted_hamiltonians))
 
 
-@jax.jit
 def compute_metrics(
     predicted_positions: chex.Array,
     predicted_momentums: chex.Array,
@@ -432,7 +429,6 @@ def log_metrics(
     summary_writer.flush()
 
 
-@jax.jit
 def fit_scaler(
     positions: chex.Array, momentums: chex.Array, scaler: scalers.Scaler
 ) -> scalers.Scaler:
@@ -448,7 +444,6 @@ def fit_scaler(
     return scaler.fit(coords)
 
 
-@jax.jit
 def transform_with_scaler(
     positions: chex.Array, momentums: chex.Array, scaler: scalers.Scaler
 ) -> Tuple[chex.Array, chex.Array]:
@@ -468,7 +463,6 @@ def transform_with_scaler(
     return positions, momentums
 
 
-@jax.jit
 def inverse_transform_with_scaler(
     positions: chex.Array, momentums: chex.Array, scaler: scalers.Scaler
 ) -> Tuple[chex.Array, chex.Array]:
@@ -654,7 +648,7 @@ def train_and_evaluate(
     else:
         raise ValueError(f"Unsupported feature for split: {config.split_on}.")
 
-    # Rescale.
+    # Create scaler to normalize data.
     scaler = create_scaler(config)
     scaler = fit_scaler(train_positions, train_momentums, scaler)
     train_positions, train_momentums = transform_with_scaler(
@@ -666,8 +660,9 @@ def train_and_evaluate(
 
     # Initialize model.
     logging.info("Constructing model.")
+    rng, state_rng = jax.random.split(rng)
     state = create_train_state(
-        config, rng, (train_positions[:1], train_momentums[:1], time_delta)
+        config, state_rng, (train_positions[:1], train_momentums[:1], time_delta)
     )
     best_state = state
     parameter_overview.log_parameter_overview(state.params)

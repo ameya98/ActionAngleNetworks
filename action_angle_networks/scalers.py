@@ -16,7 +16,7 @@
 """Implements scalers for data pre-processing in a JAX-compatible manner."""
 
 import abc
-from typing import Optional, Tuple
+from typing import Optional
 
 import chex
 import flax
