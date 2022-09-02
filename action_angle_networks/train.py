@@ -25,6 +25,7 @@ import jax
 import jax.numpy as jnp
 import ml_collections
 import optax
+import yaml
 
 from absl import logging
 from clu import checkpoint, metric_writers, parameter_overview
@@ -679,6 +680,11 @@ def train_and_evaluate(
     # Thus, training always begins from scratch.
     checkpoint_dir = os.path.join(workdir, "checkpoints")
     ckpt = checkpoint.Checkpoint(checkpoint_dir, max_to_keep=2)
+
+    # Save the config for reproducibility.
+    config_path = os.path.join(workdir, "config.yml")
+    with open(config_path, "w") as f:
+        yaml.dump(config, f)
 
     min_train_loss = jnp.inf
     all_train_metrics = {}
