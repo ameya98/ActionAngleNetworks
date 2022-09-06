@@ -72,12 +72,12 @@ def compute_normal_modes(
         simulation_parameters["k_wall"],
         simulation_parameters["k_pair"],
     )
-    num_trajectories = m.shape[0]
+    num_particles = m.shape[0]
 
     # Construct coupling matrix.
-    coupling_matrix = -(k_wall + 2 * k_pair) * jnp.eye(
-        num_trajectories
-    ) + k_pair * jnp.ones((num_trajectories, num_trajectories))
+    coupling_matrix = -(k_wall + num_particles * k_pair) * jnp.eye(
+        num_particles
+    ) + k_pair * jnp.ones((num_particles, num_particles))
     coupling_matrix = jnp.diag(1 / m) @ coupling_matrix
 
     # Compute eigenvalues and eigenvectors.
