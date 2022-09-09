@@ -223,8 +223,8 @@ class PointwiseNormalizingFlow(NormalizingFlow):
             inputs.shape[-1] == 2 * num_dims
         ), f"Got inputs of shape {inputs.shape} for num_dims = {num_dims}."
 
-        first_coords = inputs[Ellipsis, :num_dims]
-        second_coords = inputs[Ellipsis, num_dims:]
+        first_coords = inputs[..., :num_dims]
+        second_coords = inputs[..., num_dims:]
 
         if self.switch:
             first_coords, second_coords = second_coords, first_coords
@@ -248,8 +248,8 @@ class PointwiseNormalizingFlow(NormalizingFlow):
             inputs.shape[-1] == 2 * num_dims
         ), f"Got inputs of shape {inputs.shape} for num_dims = {num_dims}."
 
-        first_coords = inputs[Ellipsis, :num_dims]
-        second_coords = inputs[Ellipsis, num_dims:]
+        first_coords = inputs[..., :num_dims]
+        second_coords = inputs[..., num_dims:]
 
         if self.switch:
             first_coords, second_coords = second_coords, first_coords
@@ -327,8 +327,8 @@ class ShearNormalizingFlow(NormalizingFlow):
             inputs.shape[-1] == 2 * num_dims
         ), f"Got inputs of shape {inputs.shape} for num_dims = {num_dims}."
 
-        first_coords = inputs[Ellipsis, :num_dims]
-        second_coords = inputs[Ellipsis, num_dims:]
+        first_coords = inputs[..., :num_dims]
+        second_coords = inputs[..., num_dims:]
 
         if self.switch:
             first_coords, second_coords = second_coords, first_coords
@@ -349,8 +349,8 @@ class ShearNormalizingFlow(NormalizingFlow):
             inputs.shape[-1] == 2 * num_dims
         ), f"Got inputs of shape {inputs.shape} for num_dims = {num_dims}."
 
-        first_coords = inputs[Ellipsis, :num_dims]
-        second_coords = inputs[Ellipsis, num_dims:]
+        first_coords = inputs[..., :num_dims]
+        second_coords = inputs[..., num_dims:]
 
         if self.switch:
             first_coords, second_coords = second_coords, first_coords
@@ -381,8 +381,8 @@ class SymplecticLinearFlow(NormalizingFlow):
             inputs.shape[-1] == 2 * num_dims
         ), f"Got inputs of shape {inputs.shape} for num_dims = {num_dims}."
 
-        first_coords = inputs[Ellipsis, :num_dims]
-        second_coords = inputs[Ellipsis, num_dims:]
+        first_coords = inputs[..., :num_dims]
+        second_coords = inputs[..., num_dims:]
         return first_coords, second_coords
 
     def forward(self, inputs: chex.Array) -> chex.Array:
@@ -638,8 +638,8 @@ class FlowEncoder(CoordinateEncoder):
         assert coords.shape[-1] % 2 == 0, coords.shape
 
         num_positions = coords.shape[-1] // 2
-        latent_positions = coords[Ellipsis, :num_positions]
-        latent_momentums = coords[Ellipsis, num_positions:]
+        latent_positions = coords[..., :num_positions]
+        latent_momentums = coords[..., num_positions:]
         return latent_positions, latent_momentums
 
 
@@ -659,8 +659,8 @@ class FlowDecoder(CoordinateDecoder):
         assert coords.shape[-1] % 2 == 0, coords.shape
 
         num_positions = coords.shape[-1] // 2
-        positions = coords[Ellipsis, :num_positions]
-        momentums = coords[Ellipsis, num_positions:]
+        positions = coords[..., :num_positions]
+        momentums = coords[..., num_positions:]
         return positions, momentums
 
 
@@ -830,8 +830,8 @@ class EulerUpdateNetwork(nn.Module):
 
         # Unpack.
         num_positions = derivatives.shape[-1] // 2
-        position_derivative = derivatives[Ellipsis, :num_positions]
-        momentum_derivative = derivatives[Ellipsis, num_positions:]
+        position_derivative = derivatives[..., :num_positions]
+        momentum_derivative = derivatives[..., num_positions:]
 
         # Perform Euler update.
         predicted_positions = positions + position_derivative * time_delta

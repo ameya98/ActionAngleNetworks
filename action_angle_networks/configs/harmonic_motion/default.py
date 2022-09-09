@@ -35,4 +35,5 @@ def get_config() -> ml_collections.ConfigDict:
     config.eval_cadence = 50
     config.scaler = "standard"
     config.simulation = "harmonic"
+    config.regularizations = ml_collections.ConfigDict()
     return config

@@ -23,13 +23,13 @@ from action_angle_networks import train
 from action_angle_networks.configs.harmonic_motion import (
     action_angle_flow,
     action_angle_mlp,
-    euler_update,
+    euler_update_mlp,
 )
 
 _ALL_CONFIGS = {
     "action_angle_flow": action_angle_flow.get_config(),
     "action_angle_mlp": action_angle_mlp.get_config(),
-    "euler_update": euler_update.get_config(),
+    "euler_update": euler_update_mlp.get_config(),
 }
 
 

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Euler Update Networks."""
+"""Euler Update Network with MLP-based encoder and decoders."""
 
 import ml_collections
 
@@ -30,13 +30,7 @@ def get_config() -> ml_collections.ConfigDict:
     config.polar_action_angles = True
     config.learning_rate = 1e-3
     config.batch_size = 100
-    config.regularizations = ml_collections.ConfigDict(
-        {
-            "actions": 1.0,
-            "angular_velocities": 0.0,
-            "encoded_decoded_differences": 0.0,
-        }
-    )
+    config.num_train_steps = 20000
     config.simulation_parameter_ranges = ml_collections.ConfigDict(
         {
             "phi": (0, 1),

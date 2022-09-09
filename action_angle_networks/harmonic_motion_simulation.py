@@ -127,16 +127,17 @@ def generate_canonical_coordinates_for_normal_mode(
     return position, momentum
 
 
-def _squared_l2_distance(u: chex.Array, v: chex.Array) -> chex.Array:
-    return jnp.square(u - v).sum()
-
-
 def compute_hamiltonian(
     position: chex.Array,
     momentum: chex.Array,
     simulation_parameters: Mapping[str, chex.Array],
 ) -> chex.Array:
     """Computes the Hamiltonian at the given coordinates."""
+
+    def _squared_l2_distance(u: chex.Array, v: chex.Array) -> chex.Array:
+        """Returns the squared L2 distance between two vectors."""
+        return jnp.square(u - v).sum()
+
     m, k_wall, k_pair = (
         simulation_parameters["m"],
         simulation_parameters["k_wall"],
@@ -404,52 +405,38 @@ def static_plot_coordinates_in_phase_space(
     assert ps.ndim == 2, f"Got momentums of shape {ps.shape}."
 
     if fig is None:
-        # Create new Figure with black background
-        fig = plt.figure(figsize=(8, 6), facecolor="black")
-    else:
-        fig.set_facecolor("black")
+        # Create new Figure.
+        fig = plt.figure(figsize=(8, 6))
 
     if ax is None:
         # Add a subplot.
-        ax = plt.subplot(facecolor="black", frameon=False)
+        ax = plt.subplot(frameon=False)
     else:
-        ax.set_facecolor("black")
         ax.set_frame_on(False)
 
-    # Two part titles to get different font weights
+    # Add title.
     fig.text(
         x=0.5,
-        y=0.83,
-        s=title + " ",
+        y=0.9,
+        s=title,
         ha="center",
-        va="bottom",
-        color="w",
-        family="sans-serif",
-        fontweight="light",
+        va="center",
         fontsize=16,
-    )
-    fig.text(
-        x=0.5,
-        y=0.78,
-        s="PHASE SPACE VISUALIZED",
-        ha="center",
-        va="bottom",
-        color="w",
-        family="sans-serif",
-        fontweight="bold",
-        fontsize=16,
+        transform=ax.transAxes,
     )
 
-    for qs_series, ps_series in zip(qs.T, ps.T):
+    colors = plt.cm.inferno(np.linspace(0.1, 0.8, qs.shape[1]))
+    for qs_series, ps_series, color in zip(qs.T, ps.T, colors):
         ax.plot(
             qs_series,
             ps_series,
             marker="o",
             markersize=2,
             linestyle="None",
-            color="white",
+            zorder=1,
+            color=color,
         )
-        ax.scatter(qs_series[0], ps_series[0], marker="o", s=40, color="white")
+        ax.scatter(qs_series[0], ps_series[0], marker="o", s=30, zorder=2, color="gray")
 
     if max_position is None:
         q_max = np.max(np.abs(qs))
@@ -461,20 +448,20 @@ def static_plot_coordinates_in_phase_space(
     else:
         p_max = max_momentum
 
-    ax.text(0, p_max * 1.7, r"$p$", ha="center", va="center", size=14, color="white")
-    ax.text(q_max * 1.7, 0, r"$q$", ha="center", va="center", size=14, color="white")
+    ax.text(0, p_max * 1.65, r"$p$", ha="center", va="center", size=14)
+    ax.text(q_max * 1.6, 0, r"$q$", ha="center", va="center", size=14)
 
     ax.plot(
-        [-q_max * 1.5, q_max * 1.5],  # pylint: disable=invalid-unary-operand-type
+        [-q_max * 1.5, q_max * 1.5],
         [0, 0],
         linestyle="dashed",
-        color="white",
+        color="black",
     )
     ax.plot(
         [0, 0],
-        [-p_max * 1.5, p_max * 1.5],  # pylint: disable=invalid-unary-operand-type
+        [-p_max * 1.5, p_max * 1.5],
         linestyle="dashed",
-        color="white",
+        color="black",
     )
 
     ax.set_xlim(-(q_max * 2), (q_max * 2))
@@ -483,5 +470,4 @@ def static_plot_coordinates_in_phase_space(
     # No ticks
     ax.set_xticks([])
     ax.set_yticks([])
-    plt.close()
     return fig

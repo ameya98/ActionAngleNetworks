@@ -105,6 +105,7 @@ def create_scaler(config: ml_collections.ConfigDict) -> scalers.Scaler:
 
 def create_model(config: ml_collections.ConfigDict) -> nn.Module:
     """Creates the model."""
+    num_trajectories = config.num_trajectories
     activation = getattr(jax.nn, config.activation, None)
     latent_size = config.latent_size
 
@@ -118,10 +119,10 @@ def create_model(config: ml_collections.ConfigDict) -> nn.Module:
             ),
             transform_fn=models.MLP([latent_size], activation, skip_connections=True),
             latent_position_decoder=models.MLP(
-                [latent_size, 1], activation, skip_connections=True
+                [latent_size, num_trajectories], activation, skip_connections=True
             ),
             latent_momentum_decoder=models.MLP(
-                [latent_size, 1], activation, skip_connections=True
+                [latent_size, num_trajectories], activation, skip_connections=True
             ),
             name="encoder",
         )
@@ -134,16 +135,16 @@ def create_model(config: ml_collections.ConfigDict) -> nn.Module:
             ),
             transform_fn=models.MLP([latent_size], activation, skip_connections=True),
             position_decoder=models.MLP(
-                [latent_size, 1], activation, skip_connections=True
+                [latent_size, num_trajectories], activation, skip_connections=True
             ),
             momentum_decoder=models.MLP(
-                [latent_size, 1], activation, skip_connections=True
+                [latent_size, num_trajectories], activation, skip_connections=True
             ),
             name="decoder",
         )
     if config.encoder_decoder_type == "flow":
         flow = models.create_flow(
-            config, init_shape=(config.batch_size, 2 * config.num_trajectories)
+            config, init_shape=(config.batch_size, 2 * num_trajectories)
         )
         encoder = models.FlowEncoder(flow)
         decoder = models.FlowDecoder(flow)
@@ -153,7 +154,7 @@ def create_model(config: ml_collections.ConfigDict) -> nn.Module:
         return models.ActionAngleNetwork(
             encoder=encoder,
             angular_velocity_net=models.MLP(
-                [latent_size, config.num_trajectories],
+                [latent_size, num_trajectories],
                 activation,
                 skip_connections=True,
                 name="angular_velocity_net",
