@@ -29,6 +29,7 @@ def get_config() -> ml_collections.ConfigDict:
     config.activation = "sigmoid"
     config.flow_type = "shear"
     config.num_flow_layers = 10
+    config.num_train_steps = 20000
     if config.flow_type == "masked-coupling":
         config.flow_spline_range_min = -3
         config.flow_spline_range_max = 3

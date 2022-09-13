@@ -614,6 +614,7 @@ def train_and_evaluate(
     num_trajectories = config.num_trajectories
     num_samples = config.num_samples
     train_split_proportion = config.train_split_proportion
+    test_split_proportion = config.test_split_proportion
     num_train_steps = config.num_train_steps
     regularizations = config.regularizations.to_dict()
     eval_cadence = config.eval_cadence
@@ -639,11 +640,15 @@ def train_and_evaluate(
 
     # Train-test split.
     if config.split_on == "times":
+        assert train_split_proportion + test_split_proportion <= 1
+
         num_train_samples = int(num_samples * train_split_proportion)
+        num_test_samples = int(num_samples * test_split_proportion)
+
         train_positions = all_positions[:num_train_samples]
-        test_positions = all_positions[num_train_samples:]
+        test_positions = all_positions[-num_test_samples:]
         train_momentums = all_momentums[:num_train_samples]
-        test_momentums = all_momentums[num_train_samples:]
+        test_momentums = all_momentums[-num_test_samples:]
 
         train_simulation_parameters = simulation_parameters
         test_simulation_parameters = simulation_parameters
@@ -711,8 +716,9 @@ def train_and_evaluate(
 
         # Sample indices.
         num_samples_on_trajectory = train_curr_positions.shape[0]
+        batch_size = min(config.batch_size, num_samples_on_trajectory)
         sample_indices = jax.random.choice(
-            step_rng, num_samples_on_trajectory, (config.batch_size,)
+            step_rng, num_samples_on_trajectory, (batch_size,)
         )
         batch_curr_positions = train_curr_positions[sample_indices]
         batch_curr_momentums = train_curr_momentums[sample_indices]

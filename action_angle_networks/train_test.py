@@ -23,18 +23,22 @@ from action_angle_networks import train
 from action_angle_networks.configs.harmonic_motion import (
     action_angle_flow,
     action_angle_mlp,
+    euler_update_flow,
     euler_update_mlp,
 )
 
 _ALL_CONFIGS = {
     "action_angle_flow": action_angle_flow.get_config(),
     "action_angle_mlp": action_angle_mlp.get_config(),
-    "euler_update": euler_update_mlp.get_config(),
+    "euler_update_flow": euler_update_flow.get_config(),
+    "euler_update_mlp": euler_update_mlp.get_config(),
 }
 
 
 class TrainTest(parameterized.TestCase):
-    @parameterized.parameters("action_angle_flow", "action_angle_mlp", "euler_update")
+    @parameterized.parameters(
+        "action_angle_flow", "action_angle_mlp", "euler_update_flow", "euler_update_mlp"
+    )
     def test_train_and_evaluate(self, config_name: str):
         # Load config.
         config = _ALL_CONFIGS[config_name]

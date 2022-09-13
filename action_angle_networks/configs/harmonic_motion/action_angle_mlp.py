@@ -30,6 +30,7 @@ def get_config() -> ml_collections.ConfigDict:
     config.polar_action_angles = True
     config.learning_rate = 1e-3
     config.batch_size = 100
+    config.num_train_steps = 20000
     config.regularizations = ml_collections.ConfigDict(
         {
             "actions": 1.0,
