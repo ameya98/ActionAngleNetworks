@@ -27,7 +27,6 @@ def get_config() -> ml_collections.ConfigDict:
     config.encoder_decoder_type = "mlp"
     config.latent_size = 100
     config.activation = "relu"
-    config.polar_action_angles = True
     config.learning_rate = 1e-3
     config.batch_size = 100
     config.num_train_steps = 20000

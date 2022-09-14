@@ -28,12 +28,11 @@ def get_config() -> ml_collections.ConfigDict:
     config.latent_size = 100
     config.activation = "sigmoid"
     config.flow_type = "shear"
-    config.num_flow_layers = 10
-    config.activation = "relu"
-    config.polar_action_angles = True
+    config.num_flow_layers = 20
+    config.num_train_steps = 50000
+    config.activation = "sigmoid"
     config.learning_rate = 1e-3
     config.batch_size = 100
-    config.num_train_steps = 20000
     config.simulation_parameter_ranges = ml_collections.ConfigDict(
         {
             "phi": (0, 1),

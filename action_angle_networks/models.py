@@ -521,17 +521,17 @@ def create_shear_flow(
     config: ml_collections.ConfigDict, init_shape: Tuple[int, int]
 ) -> ShearNormalizingFlow:
     """Builds the shear normalizing flow model."""
-    linear_input_dims = conditioner_input_dims = init_shape[-1] // 2
+    input_dims = init_shape[-1] // 2
     activation = getattr(jax.nn, config.activation, None)
     switch = False
-    flows = [SymplecticLinearFlow(linear_input_dims)]
+    flows = []
     for _ in range(config.num_flow_layers):
         conditioner = GradientBasedConditioner(
             projection_dims=config.latent_size, activation=activation
         )
         shear_flow = ShearNormalizingFlow(
             conditioner=conditioner,
-            conditioner_input_dims=conditioner_input_dims,
+            conditioner_input_dims=input_dims,
             switch=switch,
         )
         flows.append(shear_flow)

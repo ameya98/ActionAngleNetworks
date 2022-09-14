@@ -207,6 +207,7 @@ def compute_loss(
     predicted_momentums: chex.Array,
     target_positions: chex.Array,
     target_momentums: chex.Array,
+    time_deltas: chex.Array,
     auxiliary_predictions: Optional[Dict[str, chex.Array]] = None,
     regularizations: Optional[Dict[str, chex.Array]] = None,
 ) -> chex.Numeric:
@@ -221,6 +222,7 @@ def compute_loss(
     loss = optax.l2_loss(predictions=predicted_positions, targets=target_positions)
     loss += optax.l2_loss(predictions=predicted_momentums, targets=target_momentums)
     loss = jnp.mean(loss)
+    loss /= 1 + jnp.mean(time_deltas)
 
     if auxiliary_predictions is not None:
         angular_velocities = auxiliary_predictions["angular_velocities"]
@@ -258,6 +260,7 @@ def compute_updates(
             predicted_momentums,
             target_positions,
             target_momentums,
+            time_deltas,
             auxiliary_predictions,
             regularizations,
         )
@@ -274,6 +277,7 @@ def compute_updates(
                 encoded_decoded_momentums,
                 positions,
                 momentums,
+                jnp.zeros_like(time_deltas),
             )
             total_loss += (
                 regularizations["encoded_decoded_differences"] * encoded_decoded_loss
