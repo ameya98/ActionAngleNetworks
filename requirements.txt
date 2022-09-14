@@ -6,3 +6,5 @@ numpy
 absl-py
 chex
 ml_collections
+clu
+tensorflow
