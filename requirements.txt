@@ -8,3 +8,4 @@ chex
 ml_collections
 clu
 tensorflow
+diffrax

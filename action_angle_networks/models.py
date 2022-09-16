@@ -19,7 +19,9 @@ import abc
 from typing import Callable, Dict, Optional, Sequence, Tuple, Union
 
 import chex
+import diffrax
 import distrax
+import flax
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
@@ -828,17 +830,104 @@ class EulerUpdateNetwork(nn.Module):
         coords = jnp.concatenate([positions, momentums], axis=-1)
         derivatives = self.derivative_net(coords)
 
+        # Perform Euler update.
+        coords = coords + derivatives * time_delta
+
         # Unpack.
         num_positions = derivatives.shape[-1] // 2
-        position_derivative = derivatives[..., :num_positions]
-        momentum_derivative = derivatives[..., num_positions:]
-
-        # Perform Euler update.
-        predicted_positions = positions + position_derivative * time_delta
-        predicted_momentums = momentums + momentum_derivative * time_delta
+        predicted_positions = coords[..., :num_positions]
+        predicted_momentums = coords[..., num_positions:]
 
         # Decode.
         predicted_positions, predicted_momentums = self.decoder(
             predicted_positions, predicted_momentums
+        )
+        return predicted_positions, predicted_momentums, None
+
+
+class NeuralODE(flax.struct.PyTreeNode):
+    """A neural ODE."""
+
+    encoder: nn.Module
+    derivative_net: nn.Module
+    decoder: nn.Module
+
+    def init(
+        self,
+        init_rng: chex.PRNGKey,
+        positions: chex.Array,
+        momentums: chex.Array,
+        time_delta: chex.Array,
+    ) -> optax.Params:
+        """Initializes the model parameters with a dummy forward pass."""
+        del time_delta
+
+        # Split PRNG.
+        init_rng, encoder_rng, derivative_net_rng, decoder_rng = jax.random.split(
+            init_rng, 4
+        )
+
+        # Encode.
+        (positions, momentums), encoder_params = self.encoder.init_with_output(
+            encoder_rng, positions, momentums
+        )
+        coords = jnp.concatenate([positions, momentums], axis=-1)
+
+        # Compute derivatives.
+        # The actual forward pass is different!
+        derivatives, derivative_net_params = self.derivative_net.init_with_output(
+            derivative_net_rng, coords
+        )
+        coords += derivatives
+
+        # Decode.
+        num_positions = coords.shape[-1] // 2
+        positions = coords[..., :num_positions]
+        momentums = coords[..., num_positions:]
+        (positions, momentums), decoder_params = self.decoder.init_with_output(
+            decoder_rng, positions, momentums
+        )
+
+        return flax.core.FrozenDict(
+            {
+                "encoder": encoder_params,
+                "derivative_net": derivative_net_params,
+                "decoder": decoder_params,
+            }
+        )
+
+    def apply(
+        self,
+        params: optax.Params,
+        positions: chex.Array,
+        momentums: chex.Array,
+        time_delta: chex.Numeric,
+    ) -> Tuple[chex.Array]:
+        """Runs the actual forward pass."""
+        # Encode.
+        positions, momentums = self.encoder.apply(
+            params["encoder"], positions, momentums
+        )
+        coords = jnp.concatenate([positions, momentums], axis=-1)
+
+        # Solve differential equation to get final state.
+        def compute_derivative(t, y, args):
+            del t, args
+            return self.derivative_net.apply(params["derivative_net"], y)
+
+        term = diffrax.ODETerm(compute_derivative)
+        solver = diffrax.Dopri5()
+        solution = diffrax.diffeqsolve(
+            term, solver, t0=0, t1=time_delta, dt0=0.1, y0=coords
+        )
+        coords = solution.ys
+        coords = jnp.squeeze(coords, axis=0)
+
+        # Decode.
+        num_positions = coords.shape[-1] // 2
+        positions = coords[..., :num_positions]
+        momentums = coords[..., num_positions:]
+        predicted_positions, predicted_momentums = self.decoder.apply(
+            params["decoder"], positions, momentums
         )
         return predicted_positions, predicted_momentums, None

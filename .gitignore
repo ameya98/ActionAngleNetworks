@@ -6,3 +6,4 @@ sweep.sh
 tmp/
 workdirs/**
 notebook_outputs/**
+paper/**

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Euler Update Network with flow-based encoder and decoders."""
+"""Action-Angle Networks with MLP-based encoder and decoders."""
 
 import ml_collections
 
@@ -23,15 +23,13 @@ from action_angle_networks.configs.harmonic_motion import default
 def get_config() -> ml_collections.ConfigDict:
     """Returns a training configuration."""
     config = default.get_config()
-    config.model = "euler-update-network"
-    config.encoder_decoder_type = "flow"
+    config.model = "neural-ode"
+    config.encoder_decoder_type = "mlp"
     config.latent_size = 100
     config.activation = "relu"
-    config.flow_type = "shear"
-    config.num_flow_layers = 20
-    config.num_train_steps = 50000
     config.learning_rate = 1e-3
     config.batch_size = 100
+    config.num_train_steps = 20000
     config.simulation_parameter_ranges = ml_collections.ConfigDict(
         {
             "phi": (0, 1),

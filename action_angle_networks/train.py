@@ -169,7 +169,7 @@ def create_model(config: ml_collections.ConfigDict) -> nn.Module:
         return models.EulerUpdateNetwork(
             encoder=encoder,
             derivative_net=models.MLP(
-                [latent_size, latent_size, latent_size, 2],
+                [latent_size, latent_size, latent_size, 2 * num_trajectories],
                 activation,
                 skip_connections=True,
                 name="derivative",
@@ -177,6 +177,17 @@ def create_model(config: ml_collections.ConfigDict) -> nn.Module:
             decoder=decoder,
         )
 
+    if config.model == "neural-ode":
+        return models.NeuralODE(
+            encoder=encoder,
+            derivative_net=models.MLP(
+                [latent_size, latent_size, latent_size, 2 * num_trajectories],
+                activation,
+                skip_connections=True,
+                name="derivative",
+            ),
+            decoder=decoder,
+        )
     raise ValueError("Unsupported model.")
 
 
@@ -318,19 +329,25 @@ def compute_metrics(
     current_momentums: chex.Array,
     encoded_decoded_positions: chex.Array,
     encoded_decoded_momentums: chex.Array,
+    time_deltas: chex.Array,
     auxiliary_predictions: chex.Array,
     regularizations: chex.Array,
     compute_encoded_decoded_loss: bool = False,
 ) -> Dict[str, chex.Numeric]:
     """Computes loss and other metrics."""
     prediction_loss = compute_loss(
-        predicted_positions, predicted_momentums, target_positions, target_momentums
+        predicted_positions,
+        predicted_momentums,
+        target_positions,
+        target_momentums,
+        time_deltas,
     )
     regularized_prediction_loss = compute_loss(
         predicted_positions,
         predicted_momentums,
         target_positions,
         target_momentums,
+        time_deltas,
         auxiliary_predictions,
         regularizations,
     )
@@ -341,6 +358,7 @@ def compute_metrics(
             encoded_decoded_momentums,
             current_positions,
             current_momentums,
+            jnp.zeros_like(time_deltas),
         )
         total_loss += (
             regularizations["encoded_decoded_differences"] * encoded_decoded_loss
@@ -390,6 +408,7 @@ def compute_metrics_helper(
         curr_momentums,
         encoded_decoded_positions,
         encoded_decoded_momentums,
+        time_delta,
         auxiliary_predictions,
         regularizations,
     )

@@ -25,6 +25,7 @@ from action_angle_networks.configs.harmonic_motion import (
     action_angle_mlp,
     euler_update_flow,
     euler_update_mlp,
+    neural_ode,
 )
 
 _ALL_CONFIGS = {
@@ -32,12 +33,15 @@ _ALL_CONFIGS = {
     "action_angle_mlp": action_angle_mlp.get_config(),
     "euler_update_flow": euler_update_flow.get_config(),
     "euler_update_mlp": euler_update_mlp.get_config(),
+    "neural_ode": neural_ode.get_config(),
 }
 
 
 class TrainTest(parameterized.TestCase):
     @parameterized.parameters(
-        "action_angle_flow", "action_angle_mlp", "euler_update_flow", "euler_update_mlp"
+        "neural_ode",
+        "neural_ode"
+        # "action_angle_flow", "action_angle_mlp", "euler_update_flow", "euler_update_mlp"
     )
     def test_train_and_evaluate(self, config_name: str):
         # Load config.
