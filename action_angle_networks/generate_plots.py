@@ -1,7 +1,7 @@
 """Generates the plots for the paper."""
 
 import os
-from typing import Sequence
+from typing import Sequence, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,6 +10,13 @@ from absl import app
 from action_angle_networks import analysis
 
 PLT_STYLE_CONTEXT = ["science", "ieee", "grid"]
+
+
+def get_dirs_for_plot_performance_against_samples(config: str) -> Tuple[str, str]:
+    """Returns input and output directories for the performance against samples plot, for this config."""
+    input_dir = f"/Users/ameyad/Documents/google-research/workdirs/performance_vs_samples/action_angle_networks/configs/harmonic_motion/{config}/k_pair=0.5"
+    output_dir = f"/Users/ameyad/Documents/google-research/paper/performance_vs_samples/action_angle_networks/configs/harmonic_motion/{config}/k_pair=0.5"
+    return input_dir, output_dir
 
 
 def plot_performance_against_samples(input_dir: str, output_dir: str) -> None:
@@ -55,6 +62,13 @@ def plot_performance_against_samples(input_dir: str, output_dir: str) -> None:
         plt.ylim(5e-6, 1e3)
         plt.savefig(os.path.join(output_dir, "prediction_error.pdf"))
         plt.close()
+
+
+def get_dirs_for_plot_performance_against_steps(config: str) -> Tuple[str, str]:
+    """Returns input and output directories for the performance against steps plot, for this config."""
+    input_dir = f"/Users/ameyad/Documents/google-research/workdirs/performance_vs_steps/action_angle_networks/configs/harmonic_motion/{config}/num_samples=100"
+    output_dir = f"/Users/ameyad/Documents/google-research/paper/performance_vs_steps/action_angle_networks/configs/harmonic_motion/{config}/num_samples=100"
+    return input_dir, output_dir
 
 
 def plot_performance_against_steps(input_dir: str, output_dir: str) -> None:
@@ -107,22 +121,26 @@ def main(argv: Sequence[str]) -> None:
         raise app.UsageError("Too many command-line arguments.")
 
     # Performance against training samples.
-    input_dir = "/Users/ameyad/Documents/google-research/workdirs/performance_vs_samples/action_angle_networks/configs/harmonic_motion/action_angle_flow/k_pair=0.5"
-    output_dir = "/Users/ameyad/Documents/google-research/paper/performance_vs_samples/action_angle_networks/configs/harmonic_motion/action_angle_flow/k_pair=0.5"
-    plot_performance_against_samples(input_dir, output_dir)
+    config = "action_angle_flow"
+    dirs = get_dirs_for_plot_performance_against_samples(config)
+    plot_performance_against_samples(*dirs)
 
-    input_dir = "/Users/ameyad/Documents/google-research/workdirs/performance_vs_samples/action_angle_networks/configs/harmonic_motion/euler_update_flow/k_pair=0.5"
-    output_dir = "/Users/ameyad/Documents/google-research/paper/performance_vs_samples/action_angle_networks/configs/harmonic_motion/euler_update_flow/k_pair=0.5"
-    plot_performance_against_samples(input_dir, output_dir)
+    config = "euler_update_flow"
+    dirs = get_dirs_for_plot_performance_against_samples(config)
+    plot_performance_against_samples(*dirs)
 
     # Performance against training steps.
-    input_dir = "/Users/ameyad/Documents/google-research/workdirs/performance_vs_steps/action_angle_networks/configs/harmonic_motion/action_angle_flow/num_samples=100"
-    output_dir = "/Users/ameyad/Documents/google-research/paper/performance_vs_steps/action_angle_networks/configs/harmonic_motion/action_angle_flow/num_samples=100"
-    plot_performance_against_steps(input_dir, output_dir)
+    config = "action_angle_flow"
+    dirs = get_dirs_for_plot_performance_against_steps(config)
+    plot_performance_against_steps(*dirs)
 
-    input_dir = "/Users/ameyad/Documents/google-research/workdirs/performance_vs_steps/action_angle_networks/configs/harmonic_motion/euler_update_flow/num_samples=100"
-    output_dir = "/Users/ameyad/Documents/google-research/paper/performance_vs_steps/action_angle_networks/configs/harmonic_motion/euler_update_flow/num_samples=100"
-    plot_performance_against_steps(input_dir, output_dir)
+    config = "euler_update_flow"
+    dirs = get_dirs_for_plot_performance_against_steps(config)
+    plot_performance_against_steps(*dirs)
+
+    config = "neural_ode"
+    dirs = get_dirs_for_plot_performance_against_steps(config)
+    plot_performance_against_steps(*dirs)
 
 
 if __name__ == "__main__":

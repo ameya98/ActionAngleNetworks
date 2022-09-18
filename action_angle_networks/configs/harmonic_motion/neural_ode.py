@@ -29,7 +29,7 @@ def get_config() -> ml_collections.ConfigDict:
     config.activation = "relu"
     config.learning_rate = 1e-3
     config.batch_size = 100
-    config.num_train_steps = 20000
+    config.num_train_steps = 50000
     config.simulation_parameter_ranges = ml_collections.ConfigDict(
         {
             "phi": (0, 1),
