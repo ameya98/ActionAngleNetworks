@@ -1,0 +1,4 @@
+# Defines parameter sweeps.
+
+num_samples: [10, 20]
+latent_size: [4, 6]
