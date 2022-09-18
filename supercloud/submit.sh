@@ -14,4 +14,4 @@ echo "Number of tasks in sweep: " $LLSUB_SIZE
 BASE_WORKDIR = "/home/gridsan/adaigavane/ActionAngleNetworks/workdirs"
 
 # Start sweep.
-python -m sweep_main --index=$LLSUB_RANK --sweep_file=sweeps/$SWEEP --config=../action_angle_networks/configs/$CONFIG --base_workdir=$BASE_WORKDIR
+python -m sweep_main --index=$LLSUB_RANK --sweep_file=$SWEEP --config=$CONFIG --base_workdir=$BASE_WORKDIR
