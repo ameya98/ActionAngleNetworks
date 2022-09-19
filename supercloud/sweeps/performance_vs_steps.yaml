@@ -1,4 +1,4 @@
 # Defines parameter sweeps.
 
 num_training_steps: [50000]
-simulation_parameter_ranges.k_pair: [0.1, 0.5, 1.]
+simulation_parameter_ranges.k_pair: [[0.1], [0.5], [1.]]
