@@ -63,13 +63,7 @@ def update_config(
     config: ml_collections.ConfigDict, updates: Dict[Any, Any]
 ) -> ml_collections.ConfigDict:
     """Updates the config."""
-    config = config.unlock()
-    for update_key, update_val in updates.items():
-        if not hasattr(config, update_key):
-            raise ValueError(f"Config does not have the given key: {update_key}.")
-        config.__setattr__(update_key, update_val)
-    config = config.lock()
-    return config
+    return config.update_from_flattened_dict(updates)
 
 
 def update_workdir(base_workdir: str, sweep_file: str, updates: Dict[Any, Any]) -> str:

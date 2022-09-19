@@ -129,6 +129,10 @@ def main(argv: Sequence[str]) -> None:
     dirs = get_dirs_for_plot_performance_against_samples(config)
     plot_performance_against_samples(*dirs)
 
+    config = "neural_ode"
+    dirs = get_dirs_for_plot_performance_against_samples(config)
+    plot_performance_against_samples(*dirs)
+
     # Performance against training steps.
     config = "action_angle_flow"
     dirs = get_dirs_for_plot_performance_against_steps(config)
