@@ -6,12 +6,8 @@ source /etc/profile
 # Load Anaconda module.
 module load anaconda/2021a
 
-# Setup virtual environment.
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Install dependencies.
-pip install -r ../requirements.txt
+# Activate virtual environment.
+source ../.venv/bin/activate
 
 # Log task id.
 echo "Sweep task ID: " $LLSUB_RANK
