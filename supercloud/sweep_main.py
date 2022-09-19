@@ -63,7 +63,8 @@ def update_config(
     config: ml_collections.ConfigDict, updates: Dict[Any, Any]
 ) -> ml_collections.ConfigDict:
     """Updates the config."""
-    return config.update_from_flattened_dict(updates)
+    config.update_from_flattened_dict(updates)
+    return config
 
 
 def update_workdir(base_workdir: str, sweep_file: str, updates: Dict[Any, Any]) -> str:
