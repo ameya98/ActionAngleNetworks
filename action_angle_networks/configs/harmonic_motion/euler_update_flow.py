@@ -26,6 +26,9 @@ def get_config() -> ml_collections.ConfigDict:
     config.model = "euler-update-network"
     config.encoder_decoder_type = "flow"
     config.latent_size = 100
+    config.num_derivative_net_layers = 2
+    config.num_encoder_layers = 1
+    config.num_decoder_layers = 1
     config.activation = "relu"
     config.flow_type = "shear"
     config.num_flow_layers = 20

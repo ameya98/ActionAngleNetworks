@@ -112,33 +112,57 @@ def create_model(config: ml_collections.ConfigDict) -> nn.Module:
     if config.encoder_decoder_type == "mlp":
         encoder = models.MLPEncoder(
             position_encoder=models.MLP(
-                [latent_size], activation, skip_connections=False
+                [latent_size] * config.num_encoder_layers,
+                activation,
+                skip_connections=True,
             ),
             momentum_encoder=models.MLP(
-                [latent_size], activation, skip_connections=False
+                [latent_size] * config.num_encoder_layers,
+                activation,
+                skip_connections=True,
             ),
-            transform_fn=models.MLP([latent_size], activation, skip_connections=True),
+            transform_fn=models.MLP(
+                [latent_size] * config.num_encoder_layers,
+                activation,
+                skip_connections=True,
+            ),
             latent_position_decoder=models.MLP(
-                [latent_size, num_trajectories], activation, skip_connections=True
+                [latent_size] * config.num_encoder_layers + [num_trajectories],
+                activation,
+                skip_connections=True,
             ),
             latent_momentum_decoder=models.MLP(
-                [latent_size, num_trajectories], activation, skip_connections=True
+                [latent_size] * config.num_encoder_layers + [num_trajectories],
+                activation,
+                skip_connections=True,
             ),
             name="encoder",
         )
         decoder = models.MLPDecoder(
             latent_position_encoder=models.MLP(
-                [latent_size], activation, skip_connections=False
+                [latent_size] * config.num_decoder_layers,
+                activation,
+                skip_connections=True,
             ),
             latent_momentum_encoder=models.MLP(
-                [latent_size], activation, skip_connections=False
+                [latent_size] * config.num_decoder_layers,
+                activation,
+                skip_connections=True,
             ),
-            transform_fn=models.MLP([latent_size], activation, skip_connections=True),
+            transform_fn=models.MLP(
+                [latent_size] * config.num_decoder_layers,
+                activation,
+                skip_connections=True,
+            ),
             position_decoder=models.MLP(
-                [latent_size, num_trajectories], activation, skip_connections=True
+                [latent_size] * config.num_decoder_layers + [num_trajectories],
+                activation,
+                skip_connections=True,
             ),
             momentum_decoder=models.MLP(
-                [latent_size, num_trajectories], activation, skip_connections=True
+                [latent_size] * config.num_decoder_layers + [num_trajectories],
+                activation,
+                skip_connections=True,
             ),
             name="decoder",
         )
@@ -154,7 +178,8 @@ def create_model(config: ml_collections.ConfigDict) -> nn.Module:
         return models.ActionAngleNetwork(
             encoder=encoder,
             angular_velocity_net=models.MLP(
-                [latent_size, num_trajectories],
+                [latent_size] * (config.num_angular_velocity_net_layers - 1)
+                + [num_trajectories],
                 activation,
                 skip_connections=True,
                 name="angular_velocity_net",
@@ -169,7 +194,8 @@ def create_model(config: ml_collections.ConfigDict) -> nn.Module:
         return models.EulerUpdateNetwork(
             encoder=encoder,
             derivative_net=models.MLP(
-                [latent_size, latent_size, latent_size, 2 * num_trajectories],
+                [latent_size] * (config.num_derivative_net_layers - 1)
+                + [2 * num_trajectories],
                 activation,
                 skip_connections=True,
                 name="derivative",
@@ -181,7 +207,8 @@ def create_model(config: ml_collections.ConfigDict) -> nn.Module:
         return models.NeuralODE(
             encoder=encoder,
             derivative_net=models.MLP(
-                [latent_size, latent_size, latent_size, 2 * num_trajectories],
+                [latent_size] * (config.num_derivative_net_layers - 1)
+                + [2 * num_trajectories],
                 activation,
                 skip_connections=True,
                 name="derivative",

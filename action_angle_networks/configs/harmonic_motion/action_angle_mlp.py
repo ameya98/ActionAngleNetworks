@@ -26,6 +26,9 @@ def get_config() -> ml_collections.ConfigDict:
     config.model = "action-angle-network"
     config.encoder_decoder_type = "mlp"
     config.latent_size = 100
+    config.num_angular_velocity_net_layers = 2
+    config.num_encoder_layers = 1
+    config.num_decoder_layers = 1
     config.activation = "relu"
     config.polar_action_angles = True
     config.learning_rate = 1e-3

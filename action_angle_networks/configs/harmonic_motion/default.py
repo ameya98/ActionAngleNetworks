@@ -26,7 +26,7 @@ def get_config() -> ml_collections.ConfigDict:
     config.single_step_predictions = True
     config.num_samples = 1000
     config.split_on = "times"
-    config.train_split_proportion = 80 / 1000
+    config.train_split_proportion = 100 / 1000
     config.test_split_proportion = 500 / 1000
     config.time_delta = 1.0
     config.train_time_jump_schedule = "linear"
