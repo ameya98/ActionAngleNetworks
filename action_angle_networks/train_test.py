@@ -39,9 +39,11 @@ _ALL_CONFIGS = {
 
 class TrainTest(parameterized.TestCase):
     @parameterized.parameters(
+        "action_angle_flow",
+        "action_angle_mlp",
+        "euler_update_flow",
+        "euler_update_mlp",
         "neural_ode",
-        "neural_ode"
-        # "action_angle_flow", "action_angle_mlp", "euler_update_flow", "euler_update_mlp"
     )
     def test_train_and_evaluate(self, config_name: str):
         # Load config.
