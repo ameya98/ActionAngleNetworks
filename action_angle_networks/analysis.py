@@ -204,3 +204,60 @@ def get_performance_against_samples(
         raise ValueError("Actual Hamiltonians not all equal.")
 
     return all_prediction_losses, all_delta_hamiltonians
+
+
+def get_performance_against_parameters(
+    workdirs: Sequence[str],
+) -> Tuple[
+    Dict[chex.Numeric, Dict[chex.Numeric, chex.Numeric]],
+    Dict[chex.Numeric, Dict[chex.Numeric, chex.Numeric]],
+]:
+    """Returns test performance against number of parameters for a list of experiments."""
+
+    all_prediction_losses = {}
+    all_delta_hamiltonians = {}
+    all_actual_hamiltonians = {}
+
+    for workdir in workdirs:
+        print(workdir)
+        config, scaler, state, aux = load_from_workdir(workdir)
+        test_positions = aux["test"]["positions"]
+        test_momentums = aux["test"]["momentums"]
+        test_simulation_parameters = aux["test"]["simulation_parameters"]
+        all_test_metrics = aux["test"]["metrics"]
+
+        true_position, true_momentum = train.inverse_transform_with_scaler(
+            test_positions[:1], test_momentums[:1], scaler
+        )
+        actual_hamiltonian = train.get_compute_hamiltonian_fn(config)(
+            true_position, true_momentum, test_simulation_parameters
+        )
+        actual_hamiltonian = np.asarray(actual_hamiltonian).squeeze()
+
+        best_step = state.step - 1
+        prediction_losses = {
+            jump: np.asarray(all_test_metrics[best_step][jump]["prediction_loss"])
+            for jump in config.test_time_jumps
+        }
+        delta_hamiltonians = {
+            jump: np.asarray(
+                all_test_metrics[best_step][jump]["mean_change_in_hamiltonians"]
+            )
+            / actual_hamiltonian
+            for jump in config.test_time_jumps
+        }
+
+        num_parameters = sum(
+            jax.tree_leaves(jax.tree_map(lambda arr: arr.size, state.params))
+        )
+        all_prediction_losses[num_parameters] = prediction_losses
+        all_delta_hamiltonians[num_parameters] = delta_hamiltonians
+        all_actual_hamiltonians[num_parameters] = actual_hamiltonian
+
+    all_actual_hamiltonians_values = list(all_actual_hamiltonians.values())
+    if not np.allclose(
+        all_actual_hamiltonians_values, all_actual_hamiltonians_values[0]
+    ):
+        raise ValueError("Actual Hamiltonians not all equal.")
+
+    return all_prediction_losses, all_delta_hamiltonians

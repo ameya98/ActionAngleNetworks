@@ -1,5 +1,6 @@
 """Generates the plots for the paper."""
 
+import glob
 import os
 from typing import Sequence, Tuple
 
@@ -10,6 +11,70 @@ from absl import app
 from action_angle_networks import analysis
 
 PLT_STYLE_CONTEXT = ["science", "ieee", "grid"]
+
+
+def get_dirs_for_plot_performance_against_parameters(config: str):
+    """Returns input and output directories for the performance against number of parameters plot, for this config."""
+    input_config_regex = f"/Users/ameyad/Documents/google-research/workdirs/performance_vs_parameters/{config}/**/config.yml"
+    if config == "neural_ode":
+        input_config_regex = f"/Users/ameyad/Documents/google-research/workdirs/performance_vs_parameters/neural_ode/**/num_derivative_net_layers=3/**/config.yml"
+
+    input_configs = glob.glob(input_config_regex, recursive=True)
+    input_dirs = [os.path.dirname(input_config) for input_config in input_configs]
+    output_dir = f"/Users/ameyad/Documents/google-research/paper/performance_vs_parameters/action_angle_networks/configs/harmonic_motion/{config}/"
+    return input_dirs, output_dir
+
+
+def plot_performance_against_parameters(input_dirs: str, output_dir: str) -> None:
+    """Plots test performance against number of training samples."""
+    print(input_dirs)
+    os.makedirs(output_dir, exist_ok=True)
+    (
+        all_prediction_losses,
+        all_delta_hamiltonians,
+    ) = analysis.get_performance_against_parameters(input_dirs)
+
+    num_parameters = sorted(all_delta_hamiltonians.keys())
+    jumps = next(iter(all_delta_hamiltonians.values())).keys()
+    colors = plt.cm.viridis(np.linspace(0, 1, len(jumps)))
+
+    with plt.style.context(PLT_STYLE_CONTEXT):
+        for jump, color in zip(jumps, colors):
+            delta_hamiltonians_for_jump = np.asarray(
+                [
+                    all_delta_hamiltonians[num_parameter][jump]
+                    for num_parameter in num_parameters
+                ]
+            )
+            plt.plot(
+                num_parameters, delta_hamiltonians_for_jump, label=jump, color=color
+            )
+
+        plt.legend(title="Jump Size")
+        plt.xlabel("Number of Parameters")
+        plt.ylabel("Mean Relative \n Change in Hamiltonian")
+        plt.yscale("log")
+        plt.ylim(1e-3, 1e4)
+        plt.savefig(os.path.join(output_dir, "relative_change_in_hamiltonian.pdf"))
+        plt.close()
+
+    with plt.style.context(PLT_STYLE_CONTEXT):
+        for jump, color in zip(jumps, colors):
+            prediction_loss_for_jump = np.asarray(
+                [
+                    all_prediction_losses[num_parameter][jump]
+                    for num_parameter in num_parameters
+                ]
+            )
+            plt.plot(num_parameters, prediction_loss_for_jump, label=jump, color=color)
+
+        plt.legend(title="Jump Size")
+        plt.xlabel("Number of Parameters")
+        plt.ylabel("Mean Prediction Error")
+        plt.yscale("log")
+        plt.ylim(5e-6, 1e3)
+        plt.savefig(os.path.join(output_dir, "prediction_error.pdf"))
+        plt.close()
 
 
 def get_dirs_for_plot_performance_against_samples(config: str) -> Tuple[str, str]:
@@ -120,31 +185,40 @@ def main(argv: Sequence[str]) -> None:
     if len(argv) > 1:
         raise app.UsageError("Too many command-line arguments.")
 
-    # Performance against training samples.
+    # Performance against parameters.
     config = "action_angle_flow"
-    dirs = get_dirs_for_plot_performance_against_samples(config)
-    plot_performance_against_samples(*dirs)
-
-    config = "euler_update_flow"
-    dirs = get_dirs_for_plot_performance_against_samples(config)
-    plot_performance_against_samples(*dirs)
+    dirs = get_dirs_for_plot_performance_against_parameters(config)
+    plot_performance_against_parameters(*dirs)
 
     config = "neural_ode"
-    dirs = get_dirs_for_plot_performance_against_samples(config)
-    plot_performance_against_samples(*dirs)
+    dirs = get_dirs_for_plot_performance_against_parameters(config)
+    plot_performance_against_parameters(*dirs)
 
-    # Performance against training steps.
-    config = "action_angle_flow"
-    dirs = get_dirs_for_plot_performance_against_steps(config)
-    plot_performance_against_steps(*dirs)
+    # # Performance against training samples.
+    # config = "action_angle_flow"
+    # dirs = get_dirs_for_plot_performance_against_samples(config)
+    # plot_performance_against_samples(*dirs)
 
-    config = "euler_update_flow"
-    dirs = get_dirs_for_plot_performance_against_steps(config)
-    plot_performance_against_steps(*dirs)
+    # config = "euler_update_flow"
+    # dirs = get_dirs_for_plot_performance_against_samples(config)
+    # plot_performance_against_samples(*dirs)
 
-    config = "neural_ode"
-    dirs = get_dirs_for_plot_performance_against_steps(config)
-    plot_performance_against_steps(*dirs)
+    # config = "neural_ode"
+    # dirs = get_dirs_for_plot_performance_against_samples(config)
+    # plot_performance_against_samples(*dirs)
+
+    # # Performance against training steps.
+    # config = "action_angle_flow"
+    # dirs = get_dirs_for_plot_performance_against_steps(config)
+    # plot_performance_against_steps(*dirs)
+
+    # config = "euler_update_flow"
+    # dirs = get_dirs_for_plot_performance_against_steps(config)
+    # plot_performance_against_steps(*dirs)
+
+    # config = "neural_ode"
+    # dirs = get_dirs_for_plot_performance_against_steps(config)
+    # plot_performance_against_steps(*dirs)
 
 
 if __name__ == "__main__":
