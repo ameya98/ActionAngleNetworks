@@ -15,39 +15,40 @@
 
 """Tests for train."""
 
+import importlib
 import tempfile
+from distutils.command.config import config
+
+import ml_collections
 
 from absl.testing import absltest, parameterized
 
 from action_angle_networks import train
-from action_angle_networks.configs.harmonic_motion import (
-    action_angle_flow,
-    action_angle_mlp,
-    euler_update_flow,
-    euler_update_mlp,
-    neural_ode,
-)
 
-_ALL_CONFIGS = {
-    "action_angle_flow": action_angle_flow.get_config(),
-    "action_angle_mlp": action_angle_mlp.get_config(),
-    "euler_update_flow": euler_update_flow.get_config(),
-    "euler_update_mlp": euler_update_mlp.get_config(),
-    "neural_ode": neural_ode.get_config(),
-}
+
+def get_config(config_name: str, simulation: str) -> ml_collections.ConfigDict:
+    """Returns the appropriate config."""
+    config_module = importlib.import_module(
+        f"action_angle_networks.configs.{simulation}.{config_name}"
+    )
+    return config_module.get_config()
 
 
 class TrainTest(parameterized.TestCase):
-    @parameterized.parameters(
-        "action_angle_flow",
-        "action_angle_mlp",
-        "euler_update_flow",
-        "euler_update_mlp",
-        "neural_ode",
+    @parameterized.product(
+        config_name=[
+            "action_angle_flow",
+            "action_angle_mlp",
+            "euler_update_flow",
+            "euler_update_mlp",
+            "neural_ode",
+            "hamiltonian_neural_network",
+        ],
+        simulation=["orbit"],
     )
-    def test_train_and_evaluate(self, config_name: str):
+    def test_train_and_evaluate(self, config_name: str, simulation: str):
         # Load config.
-        config = _ALL_CONFIGS[config_name]
+        config = get_config(config_name, simulation)
         config.num_train_steps = 5
 
         # Create a temporary directory where metrics are written.

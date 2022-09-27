@@ -22,6 +22,8 @@ import jax
 import jax.numpy as jnp
 import jaxopt
 
+_SIMULATION_PARAMETERS = ["t0", "a", "m", "e", "k"]
+
 
 def sample_simulation_parameters(
     simulation_parameter_ranges: Mapping[str, Tuple[chex.Numeric, chex.Numeric]],
@@ -29,6 +31,10 @@ def sample_simulation_parameters(
     rng: chex.PRNGKey,
 ) -> Dict[str, chex.Array]:
     """Samples simulation parameters."""
+    # Check that all simulation parameter ranges are available.
+    for simulation_parameter in _SIMULATION_PARAMETERS:
+        if not simulation_parameter in simulation_parameter_ranges:
+            raise ValueError(f"Missing simulation parameter: {simulation_parameter}")
 
     is_tuple = lambda val: isinstance(val, tuple)
     ranges_flat, ranges_treedef = jax.tree_flatten(
@@ -66,7 +72,20 @@ def generate_canonical_coordinates(
     simulation_parameters: Mapping[str, chex.Array],
     check_convergence: bool = False,
 ) -> Tuple[chex.Array, chex.Array]:
-    """Generates positions and momentums in polar coordinates."""
+    """Generates positions and momentums in polar coordinates for all trajectories."""
+    coordinates = jax.vmap(
+        generate_canonical_coordinates_for_trajectory, in_axes=(None, 0)
+    )(t, simulation_parameters)
+    coordinates = jax.tree_map(lambda arr: arr.squeeze(axis=0), coordinates)
+    return coordinates
+
+
+def generate_canonical_coordinates_for_trajectory(
+    t: chex.Numeric,
+    simulation_parameters: Mapping[str, chex.Array],
+    check_convergence: bool = False,
+) -> Tuple[chex.Array, chex.Array]:
+    """Generates positions and momentums in polar coordinates for one trajectory."""
 
     def eccentric_anomaly_to_time(eccentric_anomaly):
         """Maps eccentricity to time."""
@@ -112,6 +131,7 @@ def generate_canonical_coordinates(
     # Bundle everything up.
     position = jnp.asarray([r, phi])
     momentum = jnp.asarray([p_r, p_phi])
+    print("position", position)
     return position, momentum
 
 

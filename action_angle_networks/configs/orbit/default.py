@@ -22,8 +22,8 @@ def get_config() -> ml_collections.ConfigDict:
     """Returns a training configuration."""
     config = ml_collections.ConfigDict()
     config.rng_seed = 0
-    config.num_trajectories = 2
-    config.dimensions_per_trajectory = 1
+    config.num_trajectories = 1
+    config.dimensions_per_trajectory = 2
     config.single_step_predictions = True
     config.num_samples = 1000
     config.split_on = "times"
@@ -40,11 +40,11 @@ def get_config() -> ml_collections.ConfigDict:
     config.regularizations = ml_collections.ConfigDict()
     config.simulation_parameter_ranges = ml_collections.ConfigDict(
         {
-            "phi": (0, 1),
-            "A": (1, 10),
+            "t0": (0, 1),
+            "a": (1, 10),
             "m": (1, 5),
-            "k_wall": (0.005, 0.01),
-            "k_pair": (0,),
+            "e": (0.1, 0.2),
+            "k": (1.0, 5.0),
         }
     )
     return config

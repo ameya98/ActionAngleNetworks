@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Action-Angle Networks with MLP-based encoder and decoders."""
+"""Hamiltonian Neural Networks with MLP-based encoder and decoders."""
 
 import ml_collections
 
@@ -23,22 +23,14 @@ from action_angle_networks.configs.harmonic_motion import default
 def get_config() -> ml_collections.ConfigDict:
     """Returns a training configuration."""
     config = default.get_config()
-    config.model = "action-angle-network"
+    config.model = "hamiltonian-neural-network"
     config.encoder_decoder_type = "mlp"
     config.latent_size = 100
-    config.num_angular_velocity_net_layers = 2
-    config.num_encoder_layers = 1
-    config.num_decoder_layers = 1
+    config.num_hamiltonian_net_layers = 4
+    config.num_encoder_layers = 2
+    config.num_decoder_layers = 2
     config.activation = "relu"
-    config.polar_action_angles = True
     config.learning_rate = 1e-3
     config.batch_size = 100
-    config.num_train_steps = 20000
-    config.regularizations = ml_collections.ConfigDict(
-        {
-            "actions": 1.0,
-            "angular_velocities": 0.0,
-            "encoded_decoded_differences": 0.0,
-        }
-    )
+    config.num_train_steps = 50000
     return config

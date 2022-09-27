@@ -846,7 +846,7 @@ class EulerUpdateNetwork(nn.Module):
 
 
 class NeuralODE(flax.struct.PyTreeNode):
-    """A neural ODE."""
+    """An implementation of the Neural Ordinary Differential Equations model."""
 
     encoder: nn.Module
     derivative_net: nn.Module
@@ -927,6 +927,112 @@ class NeuralODE(flax.struct.PyTreeNode):
         num_positions = coords.shape[-1] // 2
         positions = coords[..., :num_positions]
         momentums = coords[..., num_positions:]
+        predicted_positions, predicted_momentums = self.decoder.apply(
+            params["decoder"], positions, momentums
+        )
+        return predicted_positions, predicted_momentums, None
+
+
+class HamiltonianNetWrapper(nn.Module):
+
+    model: nn.Module
+
+    def __call__(self, positions: chex.Array, momentums: chex.Array) -> chex.Numeric:
+        coords = jnp.concatenate([positions, momentums], axis=-1)
+        hamiltonians = self.model(coords)
+
+        assert hamiltonians.shape[-1] == 1
+        return jnp.squeeze(hamiltonians, axis=-1)
+
+
+class HamiltonianNeuralNetwork(flax.struct.PyTreeNode):
+    """An implementation of the Hamiltonian Neural Network."""
+
+    encoder: nn.Module
+    hamiltonian_net: HamiltonianNetWrapper
+    decoder: nn.Module
+
+    def init(
+        self,
+        init_rng: chex.PRNGKey,
+        positions: chex.Array,
+        momentums: chex.Array,
+        time_delta: chex.Array,
+    ) -> optax.Params:
+        """Initializes the model parameters with a dummy forward pass."""
+        del time_delta
+
+        # Split PRNG.
+        init_rng, encoder_rng, hamiltonian_net_rng, decoder_rng = jax.random.split(
+            init_rng, 4
+        )
+
+        # Encode.
+        (positions, momentums), encoder_params = self.encoder.init_with_output(
+            encoder_rng, positions, momentums
+        )
+        coords = jnp.concatenate([positions, momentums], axis=-1)
+
+        # Compute derivatives.
+        # The actual forward pass is different!
+        hamiltonian_net_params = self.hamiltonian_net.init(
+            hamiltonian_net_rng,
+            positions,
+            momentums,
+        )
+
+        # Decode.
+        num_positions = coords.shape[-1] // 2
+        positions = coords[..., :num_positions]
+        momentums = coords[..., num_positions:]
+        (positions, momentums), decoder_params = self.decoder.init_with_output(
+            decoder_rng, positions, momentums
+        )
+
+        return flax.core.FrozenDict(
+            {
+                "encoder": encoder_params,
+                "hamiltonian_net": hamiltonian_net_params,
+                "decoder": decoder_params,
+            }
+        )
+
+    def apply(
+        self,
+        params: optax.Params,
+        positions: chex.Array,
+        momentums: chex.Array,
+        time_delta: chex.Numeric,
+    ) -> Tuple[chex.Array]:
+        """Runs the actual forward pass."""
+        # Encode.
+        positions, momentums = self.encoder.apply(
+            params["encoder"], positions, momentums
+        )
+
+        # Solve differential equation to get final state.
+        def compute_derivatives(t, y, args):
+            del t, args
+            positions, momentums = y
+            positions_grad = jax.vmap(
+                jax.grad(self.hamiltonian_net.apply, argnums=2), in_axes=(None, 0, 0)
+            )(params["hamiltonian_net"], positions, momentums)
+            momentums_grad = jax.vmap(
+                jax.grad(self.hamiltonian_net.apply, argnums=1), in_axes=(None, 0, 0)
+            )(params["hamiltonian_net"], positions, momentums)
+            momentums_grad = jax.tree_map(lambda grad: -grad, momentums_grad)
+            return positions_grad, momentums_grad
+
+        term = diffrax.ODETerm(compute_derivatives)
+        solver = diffrax.Dopri5()
+        solution = diffrax.diffeqsolve(
+            term, solver, t0=0, t1=time_delta, dt0=0.1, y0=(positions, momentums)
+        )
+        positions, momentums = solution.ys
+        positions = jnp.squeeze(positions, axis=0)
+        momentums = jnp.squeeze(momentums, axis=0)
+
+        # Decode.
         predicted_positions, predicted_momentums = self.decoder.apply(
             params["decoder"], positions, momentums
         )

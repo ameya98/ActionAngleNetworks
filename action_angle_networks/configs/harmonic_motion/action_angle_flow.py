@@ -45,13 +45,4 @@ def get_config() -> ml_collections.ConfigDict:
             "encoded_decoded_differences": 0.0,
         }
     )
-    config.simulation_parameter_ranges = ml_collections.ConfigDict(
-        {
-            "phi": (0, 1),
-            "A": (1, 10),
-            "m": (1, 5),
-            "k_wall": (0.005, 0.01),
-            "k_pair": (0,),
-        }
-    )
     return config

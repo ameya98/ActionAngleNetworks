@@ -106,61 +106,65 @@ def create_scaler(config: ml_collections.ConfigDict) -> scalers.Scaler:
 def create_model(config: ml_collections.ConfigDict) -> nn.Module:
     """Creates the model."""
     num_trajectories = config.num_trajectories
+    dimensions_per_trajectory = config.dimensions_per_trajectory
+    output_dims = dimensions_per_trajectory * num_trajectories
     activation = getattr(jax.nn, config.activation, None)
     latent_size = config.latent_size
 
     if config.encoder_decoder_type == "mlp":
+        num_encoder_layers = config.get("num_encoder_layers", 1)
         encoder = models.MLPEncoder(
             position_encoder=models.MLP(
-                [latent_size] * config.num_encoder_layers,
+                [latent_size] * num_encoder_layers,
                 activation,
                 skip_connections=True,
             ),
             momentum_encoder=models.MLP(
-                [latent_size] * config.num_encoder_layers,
+                [latent_size] * num_encoder_layers,
                 activation,
                 skip_connections=True,
             ),
             transform_fn=models.MLP(
-                [latent_size] * config.num_encoder_layers,
+                [latent_size] * num_encoder_layers,
                 activation,
                 skip_connections=True,
             ),
             latent_position_decoder=models.MLP(
-                [latent_size] * config.num_encoder_layers + [num_trajectories],
+                [latent_size] * num_encoder_layers + [output_dims],
                 activation,
                 skip_connections=True,
             ),
             latent_momentum_decoder=models.MLP(
-                [latent_size] * config.num_encoder_layers + [num_trajectories],
+                [latent_size] * num_encoder_layers + [output_dims],
                 activation,
                 skip_connections=True,
             ),
             name="encoder",
         )
+        num_decoder_layers = config.get("num_decoder_layers", 1)
         decoder = models.MLPDecoder(
             latent_position_encoder=models.MLP(
-                [latent_size] * config.num_decoder_layers,
+                [latent_size] * num_decoder_layers,
                 activation,
                 skip_connections=True,
             ),
             latent_momentum_encoder=models.MLP(
-                [latent_size] * config.num_decoder_layers,
+                [latent_size] * num_decoder_layers,
                 activation,
                 skip_connections=True,
             ),
             transform_fn=models.MLP(
-                [latent_size] * config.num_decoder_layers,
+                [latent_size] * num_decoder_layers,
                 activation,
                 skip_connections=True,
             ),
             position_decoder=models.MLP(
-                [latent_size] * config.num_decoder_layers + [num_trajectories],
+                [latent_size] * num_decoder_layers + [output_dims],
                 activation,
                 skip_connections=True,
             ),
             momentum_decoder=models.MLP(
-                [latent_size] * config.num_decoder_layers + [num_trajectories],
+                [latent_size] * num_decoder_layers + [output_dims],
                 activation,
                 skip_connections=True,
             ),
@@ -168,18 +172,19 @@ def create_model(config: ml_collections.ConfigDict) -> nn.Module:
         )
     if config.encoder_decoder_type == "flow":
         flow = models.create_flow(
-            config, init_shape=(config.batch_size, 2 * num_trajectories)
+            config, init_shape=(config.batch_size, 2 * output_dims)
         )
         encoder = models.FlowEncoder(flow)
         decoder = models.FlowDecoder(flow)
 
-    # Action-Angle Neural Network.
     if config.model == "action-angle-network":
+        num_angular_velocity_net_layers = config.get(
+            "num_angular_velocity_net_layers", 2
+        )
         return models.ActionAngleNetwork(
             encoder=encoder,
             angular_velocity_net=models.MLP(
-                [latent_size] * (config.num_angular_velocity_net_layers - 1)
-                + [num_trajectories],
+                [latent_size] * (num_angular_velocity_net_layers - 1) + [output_dims],
                 activation,
                 skip_connections=True,
                 name="angular_velocity_net",
@@ -189,13 +194,12 @@ def create_model(config: ml_collections.ConfigDict) -> nn.Module:
             single_step_predictions=config.single_step_predictions,
         )
 
-    # Baseline Euler Update Network.
     if config.model == "euler-update-network":
+        num_derivative_net_layers = config.get("num_derivative_net_layers", 4)
         return models.EulerUpdateNetwork(
             encoder=encoder,
             derivative_net=models.MLP(
-                [latent_size] * (config.num_derivative_net_layers - 1)
-                + [2 * num_trajectories],
+                [latent_size] * (num_derivative_net_layers - 1) + [2 * output_dims],
                 activation,
                 skip_connections=True,
                 name="derivative",
@@ -204,17 +208,33 @@ def create_model(config: ml_collections.ConfigDict) -> nn.Module:
         )
 
     if config.model == "neural-ode":
+        num_derivative_net_layers = config.get("num_derivative_net_layers", 4)
         return models.NeuralODE(
             encoder=encoder,
             derivative_net=models.MLP(
-                [latent_size] * (config.num_derivative_net_layers - 1)
-                + [2 * num_trajectories],
+                [latent_size] * (num_derivative_net_layers - 1) + [2 * output_dims],
                 activation,
                 skip_connections=True,
                 name="derivative",
             ),
             decoder=decoder,
         )
+
+    if config.model == "hamiltonian-neural-network":
+        num_hamiltonian_net_layers = config.get("num_hamiltonian_net_layers", 4)
+        return models.HamiltonianNeuralNetwork(
+            encoder=encoder,
+            hamiltonian_net=models.HamiltonianNetWrapper(
+                models.MLP(
+                    [latent_size] * (num_hamiltonian_net_layers - 1) + [1],
+                    activation,
+                    skip_connections=True,
+                    name="hamiltonian",
+                )
+            ),
+            decoder=decoder,
+        )
+
     raise ValueError("Unsupported model.")
 
 
@@ -227,7 +247,9 @@ def create_train_state(
     model = create_model(config)
     params = model.init(rng, *init_samples)
     tx = optax.adam(learning_rate=config.learning_rate)
-    return train_state.TrainState.create(apply_fn=model.apply, params=params, tx=tx)
+    return train_state.TrainState.create(
+        apply_fn=jax.jit(model.apply), params=params, tx=tx
+    )
 
 
 def compute_predictions(
@@ -683,10 +705,18 @@ def train_and_evaluate(
         num_trajectories,
         simulation_parameters_rng,
     )
+    print("simulation_parameters", simulation_parameters)
     times = jnp.arange(num_samples) * time_delta
     all_positions, all_momentums = generate_canonical_coordinates_fn(
         times, simulation_parameters
     )
+    print(all_positions.shape)
+    assert (
+        len(all_positions.shape) == 2
+    ), f"Received all_positions of shape: {all_positions.shape}"
+    assert (
+        len(all_momentums.shape) == 2
+    ), f"Received all_momentums of shape: {all_momentums.shape}"
 
     # Train-test split.
     if config.split_on == "times":
@@ -754,7 +784,6 @@ def train_and_evaluate(
         # Sample time jump.
         step_rng, jump_rng = jax.random.split(step_rng)
         jump = sample_time_jump_fn(step, jump_rng)
-
         # Setup inputs and targets on all trajectories.
         (
             train_curr_positions,

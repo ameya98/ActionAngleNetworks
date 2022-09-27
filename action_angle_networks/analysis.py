@@ -1,6 +1,7 @@
 """Scripts for loading and analyzing trained models."""
 import os
-from typing import Any, Dict, Optional, Sequence, Tuple
+import time
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple
 
 import chex
 import jax
@@ -14,19 +15,6 @@ from clu import checkpoint
 from flax.training import train_state
 
 from action_angle_networks import scalers, train
-from action_angle_networks.configs.harmonic_motion import (
-    action_angle_flow,
-    action_angle_mlp,
-    euler_update_flow,
-    euler_update_mlp,
-)
-
-_ALL_CONFIGS = {
-    "action_angle_flow": action_angle_flow.get_config(),
-    "action_angle_mlp": action_angle_mlp.get_config(),
-    "euler_update_flow": euler_update_flow.get_config(),
-    "euler_update_mlp": euler_update_mlp.get_config(),
-}
 
 
 def cast_keys_as_int(dictionary: Dict[Any, Any]) -> Dict[Any, Any]:
@@ -49,7 +37,7 @@ def cast_keys_as_int(dictionary: Dict[Any, Any]) -> Dict[Any, Any]:
 
 def load_from_workdir(
     workdir: str,
-    default_config: Optional[str] = None,
+    default_config: Optional[ml_collections.ConfigDict] = None,
 ) -> Tuple[
     ml_collections.ConfigDict, scalers.Scaler, train_state.TrainState, Dict[Any, Any]
 ]:
@@ -71,9 +59,7 @@ def load_from_workdir(
         )
         if default_config is None:
             raise ValueError("Please supply a value for default_config.")
-        config = _ALL_CONFIGS[default_config]
-
-    logging.info("Using config: %s", config)
+        config = default_config
 
     # Mimic what we do in train.py.
     # To be honest, this doesn't really matter right now,
@@ -219,7 +205,6 @@ def get_performance_against_parameters(
     all_actual_hamiltonians = {}
 
     for workdir in workdirs:
-        print(workdir)
         config, scaler, state, aux = load_from_workdir(workdir)
         test_positions = aux["test"]["positions"]
         test_momentums = aux["test"]["momentums"]
@@ -261,3 +246,105 @@ def get_performance_against_parameters(
         raise ValueError("Actual Hamiltonians not all equal.")
 
     return all_prediction_losses, all_delta_hamiltonians
+
+
+def _measure_execution_time(func: Callable[[Any], Any], *args, **kwargs):
+    """Measures the time taken to execute a jittable function."""
+    # Wrap in JIT.
+    jitted_func = jax.jit(func)
+
+    # Call the function once so that we don't measure JAX tracing time.
+    jitted_func(*args, **kwargs)
+
+    # Now measure the actual time taken.
+    start_time = time.time()
+    jax.block_until_ready(jitted_func(*args, **kwargs))
+    return time.time() - start_time
+
+
+def get_inference_times(workdir: str) -> Dict[chex.Numeric, chex.Numeric]:
+    """Returns the inference time for different jump sizes."""
+
+    config, _, state, aux = load_from_workdir(workdir)
+    test_positions = aux["test"]["positions"]
+    test_momentums = aux["test"]["momentums"]
+
+    inference_times = {}
+    for jump in config.test_time_jumps:
+        inference_times[jump] = _measure_execution_time(
+            state.apply_fn,
+            state.params,
+            test_positions,
+            test_momentums,
+            jump * config.time_delta,
+        )
+    return inference_times
+
+
+def get_performance_against_time(workdir: str) -> Dict[int, chex.Numeric]:
+    """Returns errors as a function of time from an initial point."""
+
+    config, _, state, aux = load_from_workdir(workdir)
+    test_positions = aux["test"]["positions"]
+    test_momentums = aux["test"]["momentums"]
+
+    errors = {}
+    jumps = [1, 2, 5, 10, 20, 50, 100, 200, 400]
+    for jump in jumps:
+        (
+            curr_positions,
+            curr_momentums,
+            target_positions,
+            target_momentums,
+        ) = train.get_coordinates_for_time_jump(test_positions, test_momentums, jump)
+        curr_positions = curr_positions[:1]
+        curr_momentums = curr_momentums[:1]
+        target_positions = target_positions[:1]
+        target_momentums = target_momentums[:1]
+        (predicted_positions, predicted_momentums, _,) = train.compute_predictions(
+            state, curr_positions, curr_momentums, jump * config.time_delta
+        )
+        errors[jump] = train.compute_loss(
+            predicted_positions,
+            predicted_momentums,
+            target_positions,
+            target_momentums,
+            time_deltas=config.time_delta,
+        )
+    return errors
+
+
+def get_true_trajectories(workdir: str, jump: int) -> Dict[int, chex.Numeric]:
+    """Returns true trajectories."""
+
+    _, scaler, _, aux = load_from_workdir(workdir)
+    test_positions = aux["test"]["positions"]
+    test_momentums = aux["test"]["momentums"]
+    (
+        _,
+        _,
+        target_positions,
+        target_momentums,
+    ) = train.get_coordinates_for_time_jump(test_positions, test_momentums, jump)
+    return train.inverse_transform_with_scaler(
+        target_positions, target_momentums, scaler
+    )
+
+
+def get_predicted_trajectories(workdir: str, jump: int) -> Dict[int, chex.Numeric]:
+    """Returns predicted trajectories."""
+
+    config, scaler, state, aux = load_from_workdir(workdir)
+    test_positions = aux["test"]["positions"]
+    test_momentums = aux["test"]["momentums"]
+    (
+        curr_positions,
+        curr_momentums,
+        *_,
+    ) = train.get_coordinates_for_time_jump(test_positions, test_momentums, jump)
+    (predicted_positions, predicted_momentums, _,) = train.compute_predictions(
+        state, curr_positions, curr_momentums, jump * config.time_delta
+    )
+    return train.inverse_transform_with_scaler(
+        predicted_positions, predicted_momentums, scaler
+    )

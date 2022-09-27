@@ -17,7 +17,7 @@
 
 import ml_collections
 
-from action_angle_networks.configs.harmonic_motion import default
+from action_angle_networks.configs.orbit import default
 
 
 def get_config() -> ml_collections.ConfigDict:

@@ -35,13 +35,4 @@ def get_config() -> ml_collections.ConfigDict:
     config.num_train_steps = 50000
     config.learning_rate = 1e-3
     config.batch_size = 100
-    config.simulation_parameter_ranges = ml_collections.ConfigDict(
-        {
-            "phi": (0, 1),
-            "A": (1, 10),
-            "m": (1, 5),
-            "k_wall": (0.005, 0.01),
-            "k_pair": (0,),
-        }
-    )
     return config

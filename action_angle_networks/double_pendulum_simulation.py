@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Simulation of coupled harmonic motion."""
+"""Simulation of a double pendulum."""
 
 from typing import Dict, Mapping, Optional, Tuple
 
@@ -24,8 +24,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import animation
 
-_SIMULATION_PARAMETERS = ["A", "phi", "m", "k_wall", "k_pair"]
-
 
 def sample_simulation_parameters(
     simulation_parameter_ranges: Mapping[str, Tuple[float, float]],
@@ -33,10 +31,6 @@ def sample_simulation_parameters(
     rng: chex.PRNGKey,
 ) -> Dict[str, chex.Array]:
     """Samples simulation parameters."""
-    # Check that all simulation parameter ranges are available.
-    for simulation_parameter in _SIMULATION_PARAMETERS:
-        if not simulation_parameter in simulation_parameter_ranges:
-            raise ValueError(f"Missing simulation parameter: {simulation_parameter}")
 
     is_tuple = lambda val: isinstance(val, tuple)
     ranges_flat, ranges_treedef = jax.tree_flatten(
