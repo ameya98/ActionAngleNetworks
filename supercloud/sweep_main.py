@@ -73,6 +73,7 @@ def update_workdir(base_workdir: str, sweep_file: str, updates: Dict[Any, Any]) 
     workdir = os.path.join(base_workdir, sweep_file)
 
     for update_key, update_val in updates.items():
+        update_val = str(update_val).replace("[", "").replace("]", "")
         workdir = os.path.join(workdir, f"{update_key}={update_val}")
     return workdir
 

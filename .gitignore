@@ -9,3 +9,4 @@ notebook_outputs/**
 paper/**
 **/.ipynb_checkpoints
 **/LLSUB*
+rename.py
