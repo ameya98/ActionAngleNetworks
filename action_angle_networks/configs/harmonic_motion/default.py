@@ -36,7 +36,7 @@ def get_config() -> ml_collections.ConfigDict:
     config.num_train_steps = 5000
     config.eval_cadence = 50
     config.scaler = "standard"
-    config.simulation = "orbit"
+    config.simulation = "harmonic"
     config.regularizations = ml_collections.ConfigDict()
     config.simulation_parameter_ranges = ml_collections.ConfigDict(
         {

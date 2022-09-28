@@ -32,8 +32,9 @@ _CONFIG = config_flags.DEFINE_config_file(
 )
 
 
-def read_sweep_from_file(sweepfile: str):
-    with open(sweepfile, "r") as f:
+def read_sweep_from_file(sweep_file: str) -> Dict[str, Any]:
+    """Reads the sweep dictionary from the given file"""
+    with open(sweep_file, "r") as f:
         return yaml.unsafe_load(f)
 
 
@@ -67,10 +68,13 @@ def update_config(
     return config
 
 
-def update_workdir(base_workdir: str, sweep_file: str, updates: Dict[Any, Any]) -> str:
+def update_workdir(
+    base_workdir: str, sweep_file: str, config_file: str, updates: Dict[Any, Any]
+) -> str:
     """Updates the workdir."""
     sweep_file = os.path.splitext(sweep_file)[0]
     workdir = os.path.join(base_workdir, sweep_file)
+    workdir = os.path.join(workdir, config_file)
 
     for update_key, update_val in updates.items():
         update_val = str(update_val).replace("[", "").replace("]", "")
@@ -86,6 +90,9 @@ def main(argv: Sequence[str]) -> None:
     sweep_file = _SWEEP_FILE.value
     task_index = _TASK_INDEX.value
     base_workdir = _BASE_WORKDIR.value
+    config_file = config_flags.get_config_filename(flags.FLAGS["config"])
+    config_file = os.path.relpath(config_file, "../action_angle_networks/configs/")
+    print(config_file)
 
     # Get updates.
     sweep = read_sweep_from_file(sweep_file)
@@ -93,7 +100,7 @@ def main(argv: Sequence[str]) -> None:
 
     # Update config with these updates.
     config = update_config(config, updates)
-    workdir = update_workdir(base_workdir, sweep_file, updates)
+    workdir = update_workdir(base_workdir, sweep_file, config_file, updates)
 
     # Hide any GPUs from TensorFlow. Otherwise TF might reserve memory and make
     # it unavailable to JAX.
