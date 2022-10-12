@@ -47,11 +47,20 @@ def load_from_workdir(
         raise FileNotFoundError(f"{workdir} does not exist.")
 
     # Load config.
+    config = default_config
     saved_config_path = os.path.join(workdir, "config.yml")
     if os.path.exists(saved_config_path):
         logging.info("Saved config found. Loading...")
+
+        if default_config is None:
+            config = ml_collections.ConfigDict()
+        else:
+            config = default_config
+
         with open(saved_config_path, "r") as config_file:
-            config = yaml.unsafe_load(config_file)
+            loaded_config = yaml.unsafe_load(config_file)
+        config.update(loaded_config)
+
         assert config is not None
     else:
         logging.info(
@@ -138,7 +147,7 @@ def get_performance_against_steps(
 
 
 def get_performance_against_samples(
-    workdirs: Sequence[str],
+    workdirs: Sequence[str], log_num_parameters: bool = True
 ) -> Tuple[
     Dict[chex.Numeric, Dict[chex.Numeric, chex.Numeric]],
     Dict[chex.Numeric, Dict[chex.Numeric, chex.Numeric]],
@@ -151,11 +160,16 @@ def get_performance_against_samples(
 
     for workdir in workdirs:
         config, scaler, state, aux = load_from_workdir(workdir)
-
         test_positions = aux["test"]["positions"]
         test_momentums = aux["test"]["momentums"]
         test_simulation_parameters = aux["test"]["simulation_parameters"]
         all_test_metrics = aux["test"]["metrics"]
+
+        if log_num_parameters:
+            num_parameters = sum(
+                jax.tree_leaves(jax.tree_map(lambda arr: arr.size, state.params))
+            )
+            logging.info("workdir: %s, num_parameters: %d", workdir, num_parameters)
 
         true_position, true_momentum = train.inverse_transform_with_scaler(
             test_positions[:1], test_momentums[:1], scaler

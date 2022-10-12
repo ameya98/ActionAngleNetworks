@@ -74,8 +74,9 @@ def update_workdir(
     """Updates the workdir."""
     sweep_file = os.path.splitext(sweep_file)[0]
     workdir = os.path.join(base_workdir, sweep_file)
+    config_file = os.path.splitext(config_file)[0]
     workdir = os.path.join(workdir, config_file)
-
+    print(workdir)
     for update_key, update_val in updates.items():
         update_val = str(update_val).replace("[", "").replace("]", "")
         workdir = os.path.join(workdir, f"{update_key}={update_val}")
@@ -92,7 +93,6 @@ def main(argv: Sequence[str]) -> None:
     base_workdir = _BASE_WORKDIR.value
     config_file = config_flags.get_config_filename(flags.FLAGS["config"])
     config_file = os.path.relpath(config_file, "../action_angle_networks/configs/")
-    print(config_file)
 
     # Get updates.
     sweep = read_sweep_from_file(sweep_file)
@@ -120,7 +120,7 @@ def main(argv: Sequence[str]) -> None:
         platform.ArtifactType.DIRECTORY, workdir, "workdir"
     )
 
-    train.train_and_evaluate(config, workdir)
+    # train.train_and_evaluate(config, workdir)
 
 
 if __name__ == "__main__":

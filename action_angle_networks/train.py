@@ -106,7 +106,7 @@ def create_scaler(config: ml_collections.ConfigDict) -> scalers.Scaler:
 def create_model(config: ml_collections.ConfigDict) -> nn.Module:
     """Creates the model."""
     num_trajectories = config.num_trajectories
-    dimensions_per_trajectory = config.dimensions_per_trajectory
+    dimensions_per_trajectory = config.get("dimensions_per_trajectory", 1)
     output_dims = dimensions_per_trajectory * num_trajectories
     activation = getattr(jax.nn, config.activation, None)
     latent_size = config.latent_size
