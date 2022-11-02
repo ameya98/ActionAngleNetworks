@@ -38,6 +38,7 @@ def cast_keys_as_int(dictionary: Dict[Any, Any]) -> Dict[Any, Any]:
 def load_from_workdir(
     workdir: str,
     default_config: Optional[ml_collections.ConfigDict] = None,
+    update_default_config: bool = False,
 ) -> Tuple[
     ml_collections.ConfigDict, scalers.Scaler, train_state.TrainState, Dict[Any, Any]
 ]:
@@ -47,28 +48,28 @@ def load_from_workdir(
         raise FileNotFoundError(f"{workdir} does not exist.")
 
     # Load config.
-    config = default_config
     saved_config_path = os.path.join(workdir, "config.yml")
     if os.path.exists(saved_config_path):
         logging.info("Saved config found. Loading...")
-
-        if default_config is None:
-            config = ml_collections.ConfigDict()
-        else:
-            config = default_config
-
         with open(saved_config_path, "r") as config_file:
             loaded_config = yaml.unsafe_load(config_file)
-        config.update(loaded_config)
 
-        assert config is not None
+        if update_default_config:
+            logging.info("Updating default config...")
+            config = default_config.copy_and_resolve_references()
+            config.update(loaded_config)
+        else:
+            logging.info("Using loaded config directly...")
+            config = loaded_config
     else:
+        if default_config is None:
+            raise ValueError("Please supply a value for default_config.")
         logging.info(
             f"No saved config found. Using default config: %s.", default_config
         )
-        if default_config is None:
-            raise ValueError("Please supply a value for default_config.")
         config = default_config
+
+    assert config is not None
 
     # Mimic what we do in train.py.
     # To be honest, this doesn't really matter right now,
@@ -79,12 +80,13 @@ def load_from_workdir(
 
     # Set up dummy variables to obtain the structure.
     dummy_scaler = train.create_scaler(config)
+    dimensions_per_trajectory = config.get("dimensions_per_trajectory", 1)
     dummy_state = train.create_train_state(
         config,
         state_rng,
         (
-            jnp.zeros((1, config.num_trajectories)),
-            jnp.zeros((1, config.num_trajectories)),
+            jnp.zeros((1, dimensions_per_trajectory * config.num_trajectories)),
+            jnp.zeros((1, dimensions_per_trajectory * config.num_trajectories)),
             0.0,
         ),
     )
@@ -185,10 +187,10 @@ def get_performance_against_samples(
             for jump in config.test_time_jumps
         }
         delta_hamiltonians = {
-            jump: np.asarray(
+            jump: np.abs(
                 all_test_metrics[best_step][jump]["mean_change_in_hamiltonians"]
+                / actual_hamiltonian
             )
-            / actual_hamiltonian
             for jump in config.test_time_jumps
         }
 

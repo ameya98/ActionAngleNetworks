@@ -327,7 +327,7 @@ class ShearNormalizingFlow(NormalizingFlow):
         num_dims = self.conditioner_input_dims
         assert (
             inputs.shape[-1] == 2 * num_dims
-        ), f"Got inputs of shape {inputs.shape} for num_dims = {num_dims}."
+        ), f"Got inputs of shape {inputs.shape} for conditioner_input_dims = {num_dims}."
 
         first_coords = inputs[..., :num_dims]
         second_coords = inputs[..., num_dims:]

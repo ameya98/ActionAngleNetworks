@@ -15,12 +15,14 @@
 
 """Simulation of Keplerian orbits."""
 
-from typing import Dict, Mapping, Tuple
+from typing import Dict, Mapping, Optional, Tuple
 
 import chex
 import jax
 import jax.numpy as jnp
 import jaxopt
+import matplotlib.pyplot as plt
+import numpy as np
 
 _SIMULATION_PARAMETERS = ["t0", "a", "m", "e", "k"]
 
@@ -131,7 +133,6 @@ def generate_canonical_coordinates_for_trajectory(
     # Bundle everything up.
     position = jnp.asarray([r, phi])
     momentum = jnp.asarray([p_r, p_phi])
-    print("position", position)
     return position, momentum
 
 
@@ -161,20 +162,105 @@ def compute_hamiltonian(
 def polar_to_cartesian(
     position: chex.Array,
     momentum: chex.Array,
-    simulation_parameters: Dict[str, chex.Array],
 ) -> Tuple[chex.Array, chex.Array]:
     """Converts positions and momentums from polar to Cartesian coordinates."""
-    m = simulation_parameters["m"]
     r, phi = position
     p_r, p_phi = momentum
-    v_r = p_r / m
-    v_phi = p_phi / (m * r)
     position_cartesian = jnp.asarray([r * jnp.cos(phi), r * jnp.sin(phi)])
-    velocity_cartesian = jnp.asarray(
+    momentum_cartesian = jnp.asarray(
         [
-            v_r * jnp.cos(phi) - r * v_phi * jnp.sin(phi),
-            v_r * jnp.sin(phi) + r * v_phi * jnp.cos(phi),
+            p_r * jnp.cos(phi) - (p_phi / r) * jnp.sin(phi),
+            p_r * jnp.sin(phi) + (p_phi / r) * jnp.cos(phi),
         ]
     )
-    momentum_cartesian = velocity_cartesian * m
     return position_cartesian, momentum_cartesian
+
+
+def static_plot_coordinates_in_phase_space(
+    positions: chex.Array,
+    momentums: chex.Array,
+    title: str,
+    fig: Optional[plt.Figure] = None,
+    ax: Optional[plt.Axes] = None,
+    max_x_position: Optional[chex.Numeric] = None,
+    max_y_position: Optional[chex.Numeric] = None,
+) -> plt.Figure:
+    """Plots a static phase space diagram of the given coordinates."""
+    assert len(positions) == len(momentums)
+
+    qs, ps = positions, momentums
+    qs, ps = np.asarray(qs), np.asarray(ps)
+    if qs.ndim == 1:
+        qs, ps = qs[Ellipsis, np.newaxis], ps[Ellipsis, np.newaxis]
+
+    assert qs.ndim == 2, f"Got positions of shape {qs.shape}."
+    assert ps.ndim == 2, f"Got momentums of shape {ps.shape}."
+
+    # Convert to Cartesian coordinates.
+    qs, ps = jax.vmap(polar_to_cartesian)(qs, ps)
+
+    if fig is None:
+        # Create new Figure.
+        fig = plt.figure(figsize=(8, 6))
+
+    if ax is None:
+        # Add a subplot.
+        ax = plt.subplot(frameon=False)
+    else:
+        ax.set_frame_on(False)
+
+    # Add title.
+    fig.text(
+        x=0.5,
+        y=0.9,
+        s=title,
+        ha="center",
+        va="center",
+        fontsize=16,
+        transform=ax.transAxes,
+    )
+
+    ax.plot(
+        qs[:, 0],
+        qs[:, 1],
+        marker="o",
+        markersize=2,
+        linestyle="None",
+        color=plt.cm.inferno(0.1),
+        zorder=1,
+    )
+    ax.scatter(qs[0, 0], qs[0, 1], marker="o", s=30, color="gray", zorder=2)
+
+    if max_x_position is None:
+        qx_max = np.max(np.abs(qs[:, 0]))
+    else:
+        qx_max = max_x_position
+
+    if max_y_position is None:
+        qy_max = np.max(np.abs(qs[:, 1]))
+    else:
+        qy_max = max_y_position
+
+    ax.text(0, qy_max * 1.65, r"$q_y$", ha="center", va="center", size=14)
+    ax.text(qx_max * 1.6, 0, r"$q_x$", ha="center", va="center", size=14)
+
+    ax.plot(
+        [-qx_max * 1.5, qx_max * 1.5],
+        [0, 0],
+        linestyle="dashed",
+        color="black",
+    )
+    ax.plot(
+        [0, 0],
+        [-qy_max * 1.5, qy_max * 1.5],
+        linestyle="dashed",
+        color="black",
+    )
+
+    ax.set_xlim(-(qx_max * 2), (qx_max * 2))
+    ax.set_ylim(-(qy_max * 2.5), (qy_max * 2.5))
+
+    # No ticks.
+    ax.set_xticks([])
+    ax.set_yticks([])
+    return fig

@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from absl import app
 
-from action_angle_networks import analysis, harmonic_motion_simulation
+from action_angle_networks import analysis, harmonic_motion_simulation, orbit_simulation
 
 
 PLT_STYLE_CONTEXT = ["science", "ieee", "grid"]
@@ -33,29 +33,54 @@ def get_label_from_config(config: str) -> str:
 
 def get_dirs_for_plot_trajectories(
     configs: Sequence[str],
+    simulation: str,
+    num_train_samples: int,
 ) -> Tuple[Dict[str, str], str]:
     """Returns input and output directories for the inference times plot, for this config."""
+    if simulation == "harmonic_motion":
 
-    def get_input_dir_for_config(config: str) -> str:
-        return f"/Users/ameyad/Documents/google-research/workdirs/local/performance_vs_samples/action_angle_networks/configs/harmonic_motion/{config}/k_pair=0.5/num_samples=200"
+        def get_input_dir_for_config(config: str) -> str:
+            return f"/Users/ameyad/Documents/google-research/workdirs/supercloud/sweeps/harmonic_motion/harmonic_motion/performance_vs_samples/harmonic_motion/{config}.py/num_samples=1000/train_split_proportion={num_train_samples / 1000}/num_train_steps=50000/simulation_parameter_ranges.k_pair=0.1"
 
-    output_dir = f"/Users/ameyad/Documents/google-research/paper/trajectories/action_angle_networks/configs/harmonic_motion/k_pair=0.5/num_samples=200"
-    return {config: get_input_dir_for_config(config) for config in configs}, output_dir
+        output_dir = f"/Users/ameyad/Documents/google-research/paper/trajectories/action_angle_networks/configs/harmonic_motion/k_pair=0.1/num_train_samples={num_train_samples}"
+        return {
+            config: get_input_dir_for_config(config) for config in configs
+        }, output_dir
+
+    if simulation == "orbit":
+
+        def get_input_dir_for_config(config: str) -> str:
+            return f"/Users/ameyad/Documents/google-research/workdirs/supercloud/sweeps/orbit/orbit/performance_vs_samples/orbit/{config}.py/num_samples=1000/train_split_proportion={num_train_samples / 1000}/num_train_steps=50000/"
+
+        output_dir = f"/Users/ameyad/Documents/google-research/paper/trajectories/action_angle_networks/configs/orbit/num_train_samples={num_train_samples}"
+        return {
+            config: get_input_dir_for_config(config) for config in configs
+        }, output_dir
 
 
-def plot_trajectories(input_dirs: Dict[str, str], output_dir: str) -> None:
+def plot_trajectories(
+    input_dirs: Dict[str, str], output_dir: str, simulation: str, jump: int
+) -> None:
     """Plots test performance against number of training samples."""
+    output_dir = os.path.join(output_dir, f"jump={jump}")
     os.makedirs(output_dir, exist_ok=True)
+
+    if simulation == "harmonic_motion":
+        plot_coordinates_fn = (
+            harmonic_motion_simulation.static_plot_coordinates_in_phase_space
+        )
+    if simulation == "orbit":
+        plot_coordinates_fn = orbit_simulation.static_plot_coordinates_in_phase_space
+
     fig, axs = plt.subplots(
         ncols=len(input_dirs) + 1, figsize=((len(input_dirs) + 1) * 6, 5)
     )
-    jump = 50
 
     with plt.style.context(PLT_STYLE_CONTEXT):
         # Choose one of the input directories to plot the true trajectories.
         input_dir = next(iter(input_dirs.values()))
         test_positions, test_momentums = analysis.get_true_trajectories(input_dir, jump)
-        harmonic_motion_simulation.static_plot_coordinates_in_phase_space(
+        plot_coordinates_fn(
             test_positions,
             test_momentums,
             title="True Trajectory",
@@ -69,7 +94,7 @@ def plot_trajectories(input_dirs: Dict[str, str], output_dir: str) -> None:
                 predicted_positions,
                 predicted_momentums,
             ) = analysis.get_predicted_trajectories(input_dir, jump)
-            harmonic_motion_simulation.static_plot_coordinates_in_phase_space(
+            plot_coordinates_fn(
                 predicted_positions,
                 predicted_momentums,
                 title=get_label_from_config(config),
@@ -224,13 +249,22 @@ def plot_performance_against_parameters(input_dirs: str, output_dir: str) -> Non
         plt.close()
 
 
-def get_dirs_for_plot_performance_against_samples(config: str) -> Tuple[List[str], str]:
+def get_dirs_for_plot_performance_against_samples(
+    config: str, simulation: str
+) -> Tuple[List[str], str]:
     """Returns input and output directories for the performance against samples plot, for this config."""
-    input_config_regex = f"/Users/ameyad/Documents/google-research/workdirs/supercloud/sweeps/harmonic_motion/harmonic_motion/performance_vs_samples/harmonic_motion/{config}.py/**/simulation_parameter_ranges.k_pair=1.0/config.yml"
-    input_configs = glob.glob(input_config_regex, recursive=True)
-    input_dirs = [os.path.dirname(input_config) for input_config in input_configs]
-    output_dir = f"/Users/ameyad/Documents/google-research/paper/performance_vs_samples/action_angle_networks/configs/harmonic_motion/{config}/k_pair=1.0"
-    return input_dirs, output_dir
+    if simulation == "harmonic_motion":
+        input_config_regex = f"/Users/ameyad/Documents/google-research/workdirs/supercloud/sweeps/harmonic_motion/harmonic_motion/performance_vs_samples/harmonic_motion/{config}.py/**/simulation_parameter_ranges.k_pair=1.0/config.yml"
+        input_configs = glob.glob(input_config_regex, recursive=True)
+        input_dirs = [os.path.dirname(input_config) for input_config in input_configs]
+        output_dir = f"/Users/ameyad/Documents/google-research/paper/performance_vs_samples/action_angle_networks/configs/harmonic_motion/{config}/k_pair=1.0"
+        return input_dirs, output_dir
+    if simulation == "orbit":
+        input_config_regex = f"/Users/ameyad/Documents/google-research/workdirs/supercloud/sweeps/orbit/orbit/performance_vs_samples/orbit/{config}.py/**/config.yml"
+        input_configs = glob.glob(input_config_regex, recursive=True)
+        input_dirs = [os.path.dirname(input_config) for input_config in input_configs]
+        output_dir = f"/Users/ameyad/Documents/google-research/paper/performance_vs_samples/action_angle_networks/configs/orbit/{config}"
+        return input_dirs, output_dir
 
 
 def plot_performance_against_samples(input_dirs: str, output_dir: str) -> None:
@@ -333,15 +367,23 @@ def main(argv: Sequence[str]) -> None:
         raise app.UsageError("Too many command-line arguments.")
 
     # Trajectories.
-    # dirs = get_dirs_for_plot_trajectories(
-    #     configs=["action_angle_flow", "euler_update_flow", "neural_ode"]
-    # )
-    # plot_trajectories(*dirs)
+    dirs = get_dirs_for_plot_trajectories(
+        configs=[
+            "action_angle_flow",
+            "euler_update_flow",
+            "neural_ode",
+            "hamiltonian_neural_network",
+        ],
+        simulation="orbit",
+        num_train_samples=200,
+    )
+    plot_trajectories(*dirs, simulation="orbit", jump=1)
 
-    # # Performance against time.
-    # dirs = get_dirs_for_plot_performance_against_time(
-    #     configs=["action_angle_flow", "euler_update_flow", "neural_ode"])
-    # plot_performance_against_time(*dirs)
+    # Performance against time.
+    dirs = get_dirs_for_plot_performance_against_time(
+        configs=["action_angle_flow", "euler_update_flow", "neural_ode"]
+    )
+    plot_performance_against_time(*dirs)
 
     # Inference times.
     dirs = get_dirs_for_plot_inference_times(
@@ -354,14 +396,14 @@ def main(argv: Sequence[str]) -> None:
     )
     plot_inference_times(*dirs)
 
-    # # Performance against parameters.
-    # config = "action_angle_flow"
-    # dirs = get_dirs_for_plot_performance_against_parameters(config)
-    # plot_performance_against_parameters(*dirs)
+    # Performance against parameters.
+    config = "action_angle_flow"
+    dirs = get_dirs_for_plot_performance_against_parameters(config)
+    plot_performance_against_parameters(*dirs)
 
-    # config = "neural_ode"
-    # dirs = get_dirs_for_plot_performance_against_parameters(config)
-    # plot_performance_against_parameters(*dirs)
+    config = "neural_ode"
+    dirs = get_dirs_for_plot_performance_against_parameters(config)
+    plot_performance_against_parameters(*dirs)
 
     # Performance against training samples.
     for config in [
@@ -370,33 +412,33 @@ def main(argv: Sequence[str]) -> None:
         "neural_ode",
         "hamiltonian_neural_network",
     ]:
-        dirs = get_dirs_for_plot_performance_against_samples(config)
+        dirs = get_dirs_for_plot_performance_against_samples(config, "orbit")
         plot_performance_against_samples(*dirs)
 
-    # config = "action_angle_flow"
-    # dirs = get_dirs_for_plot_performance_against_samples(config)
-    # plot_performance_against_samples(*dirs)
+    config = "action_angle_flow"
+    dirs = get_dirs_for_plot_performance_against_samples(config)
+    plot_performance_against_samples(*dirs)
 
-    # config = "euler_update_flow"
-    # dirs = get_dirs_for_plot_performance_against_samples(config)
-    # plot_performance_against_samples(*dirs)
+    config = "euler_update_flow"
+    dirs = get_dirs_for_plot_performance_against_samples(config)
+    plot_performance_against_samples(*dirs)
 
-    # config = "neural_ode"
-    # dirs = get_dirs_for_plot_performance_against_samples(config)
-    # plot_performance_against_samples(*dirs)
+    config = "neural_ode"
+    dirs = get_dirs_for_plot_performance_against_samples(config)
+    plot_performance_against_samples(*dirs)
 
-    # # Performance against training steps.
-    # config = "action_angle_flow"
-    # dirs = get_dirs_for_plot_performance_against_steps(config)
-    # plot_performance_against_steps(*dirs)
+    # Performance against training steps.
+    config = "action_angle_flow"
+    dirs = get_dirs_for_plot_performance_against_steps(config)
+    plot_performance_against_steps(*dirs)
 
-    # config = "euler_update_flow"
-    # dirs = get_dirs_for_plot_performance_against_steps(config)
-    # plot_performance_against_steps(*dirs)
+    config = "euler_update_flow"
+    dirs = get_dirs_for_plot_performance_against_steps(config)
+    plot_performance_against_steps(*dirs)
 
-    # config = "neural_ode"
-    # dirs = get_dirs_for_plot_performance_against_steps(config)
-    # plot_performance_against_steps(*dirs)
+    config = "neural_ode"
+    dirs = get_dirs_for_plot_performance_against_steps(config)
+    plot_performance_against_steps(*dirs)
 
 
 if __name__ == "__main__":
