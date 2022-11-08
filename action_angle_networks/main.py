@@ -23,7 +23,7 @@ from absl import app, flags, logging
 from clu import platform
 from ml_collections import config_flags
 
-from action_angle_networks import train
+from action_angle_networks import md17_train, train
 
 
 _WORKDIR = flags.DEFINE_string("workdir", None, "Directory to store model data.")
@@ -57,7 +57,11 @@ def main(argv: Sequence[str]) -> None:
         platform.ArtifactType.DIRECTORY, _WORKDIR.value, "workdir"
     )
 
-    train.train_and_evaluate(_CONFIG.value, _WORKDIR.value)
+    config = _CONFIG.value
+    if config.simulation == "md17":
+        md17_train.train_and_evaluate(config, _WORKDIR.value)
+    else:
+        train.train_and_evaluate(config, _WORKDIR.value)
 
 
 if __name__ == "__main__":

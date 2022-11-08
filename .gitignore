@@ -10,3 +10,4 @@ paper/**
 **/.ipynb_checkpoints
 **/LLSUB*
 rename.py
+data/

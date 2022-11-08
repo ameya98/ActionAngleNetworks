@@ -76,8 +76,8 @@ def generate_canonical_coordinates(
 ) -> Tuple[chex.Array, chex.Array]:
     """Generates positions and momentums in polar coordinates for all trajectories."""
     coordinates = jax.vmap(
-        generate_canonical_coordinates_for_trajectory, in_axes=(None, 0)
-    )(t, simulation_parameters)
+        generate_canonical_coordinates_for_trajectory, in_axes=(None, 0, None)
+    )(t, simulation_parameters, check_convergence)
     coordinates = jax.tree_map(lambda arr: arr.squeeze(axis=0), coordinates)
     return coordinates
 
@@ -109,6 +109,7 @@ def generate_canonical_coordinates_for_trajectory(
     # First, compute the eccentric_anomaly at this instant.
     period = (2 * jnp.pi * jnp.power(a, 1.5)) / jnp.sqrt(k)
     solver = jaxopt.FixedPointIteration(fixed_point_func, maxiter=20, verbose=False)
+    # Guess a solution for the eccentric anomaly.
     eccentric_anomaly_init = t
     eccentric_anomaly = solver.run(eccentric_anomaly_init).params
 

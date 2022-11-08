@@ -8,7 +8,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from absl import app
 
-from action_angle_networks import analysis, harmonic_motion_simulation, orbit_simulation
+from action_angle_networks import analysis
+from action_angle_networks.simulation import (
+    harmonic_motion_simulation,
+    orbit_simulation,
+)
 
 
 PLT_STYLE_CONTEXT = ["science", "ieee", "grid"]

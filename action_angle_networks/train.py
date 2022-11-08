@@ -31,18 +31,18 @@ from absl import logging
 from clu import checkpoint, metric_writers, parameter_overview
 from flax.training import train_state
 
-from action_angle_networks import (
+from action_angle_networks import models, scalers
+from action_angle_networks.simulation import (
+    double_pendulum_simulation,
     harmonic_motion_simulation,
-    models,
     orbit_simulation,
-    scalers,
 )
 
 
 def get_generate_canonical_coordinates_fn(
     config: ml_collections.ConfigDict,
 ) -> Callable[[chex.Array, Dict[str, chex.Array]], Tuple[chex.Array, chex.Array]]:
-    """Returns a function that creates trajectories of shape [num_samples, num_trajectories]."""
+    """Returns a function that creates trajectories of shape [num_samples, num_trajectories * dimensions_per_trajectory]."""
     if config.simulation == "harmonic":
         return jax.jit(
             jax.vmap(
@@ -61,13 +61,16 @@ def get_generate_canonical_coordinates_fn(
             )
         )
 
+    if config.simulation == "double_pendulum":
+        return double_pendulum_simulation.generate_canonical_coordinates
+
     raise ValueError(f"Unsupported simulation: {config.simulation}.")
 
 
 def get_compute_hamiltonian_fn(
     config: ml_collections.ConfigDict,
 ) -> Callable[[chex.Array, chex.Array, Dict[str, chex.Array]], chex.Array]:
-    """Returns a function that computes the Hamiltonian over trajectories of shape [num_samples, num_trajectories]."""
+    """Returns a function that computes the Hamiltonian over trajectories of shape [num_samples, num_trajectories * dimensions_per_trajectory]."""
     if config.simulation == "harmonic":
         return jax.jit(
             jax.vmap(
@@ -80,6 +83,12 @@ def get_compute_hamiltonian_fn(
             jax.vmap(orbit_simulation.compute_hamiltonian, in_axes=(0, 0, None))
         )
 
+    if config.simulation == "double_pendulum":
+        return jax.jit(
+            jax.vmap(
+                double_pendulum_simulation.compute_hamiltonian, in_axes=(0, 0, None)
+            )
+        )
     raise ValueError(f"Unsupported simulation: {config.simulation}.")
 
 
@@ -90,6 +99,9 @@ def get_sample_simulation_parameters_fn(config: ml_collections.ConfigDict):
 
     if config.simulation == "orbit":
         return orbit_simulation.sample_simulation_parameters
+
+    if config.simulation == "double_pendulum":
+        return double_pendulum_simulation.sample_simulation_parameters
 
     raise ValueError(f"Unsupported simulation: {config.simulation}.")
 
@@ -561,7 +573,7 @@ def get_coordinates_for_time_jump(
     positions: chex.Array, momentums: chex.Array, jump: int
 ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array]:
     """Returns the current and target coordinates for the given jump."""
-    # Input arrays are of shape [num_samples, num_trajectories].
+    # Input arrays are of shape [num_samples, num_trajectories * dimensions_per_trajectory].
     assert positions.ndim == 2, f"Got positions of shape {positions.shape}."
     assert momentums.ndim == 2, f"Got momentums of shape {momentums.shape}."
 
@@ -575,7 +587,7 @@ def get_coordinates_for_time_jumps(
     positions: chex.Array, momentums: chex.Array, max_jump: int
 ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array]:
     """Returns the current and target coordinates for jumps upto max_jump."""
-    # Input arrays are of shape [num_samples, num_trajectories].
+    # Input arrays are of shape [num_samples, num_trajectories * dimensions_per_trajectory].
     assert positions.ndim == 2, f"Got positions of shape {positions.shape}."
     assert momentums.ndim == 2, f"Got momentums of shape {momentums.shape}."
 
@@ -705,12 +717,11 @@ def train_and_evaluate(
         num_trajectories,
         simulation_parameters_rng,
     )
-    print("simulation_parameters", simulation_parameters)
     times = jnp.arange(num_samples) * time_delta
     all_positions, all_momentums = generate_canonical_coordinates_fn(
         times, simulation_parameters
     )
-    print(all_positions.shape)
+    print(all_positions[:5], all_momentums[:5])
     assert (
         len(all_positions.shape) == 2
     ), f"Received all_positions of shape: {all_positions.shape}"
