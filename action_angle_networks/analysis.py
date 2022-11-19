@@ -149,7 +149,7 @@ def get_performance_against_steps(
 
 
 def get_performance_against_samples(
-    workdirs: Sequence[str], log_num_parameters: bool = True
+    workdirs: Sequence[str], print_num_parameters: bool = True
 ) -> Tuple[
     Dict[chex.Numeric, Dict[chex.Numeric, chex.Numeric]],
     Dict[chex.Numeric, Dict[chex.Numeric, chex.Numeric]],
@@ -167,7 +167,7 @@ def get_performance_against_samples(
         test_simulation_parameters = aux["test"]["simulation_parameters"]
         all_test_metrics = aux["test"]["metrics"]
 
-        if log_num_parameters:
+        if print_num_parameters:
             num_parameters = sum(
                 jax.tree_leaves(jax.tree_map(lambda arr: arr.size, state.params))
             )
@@ -313,10 +313,6 @@ def get_performance_against_time(workdir: str) -> Dict[int, chex.Numeric]:
             target_positions,
             target_momentums,
         ) = train.get_coordinates_for_time_jump(test_positions, test_momentums, jump)
-        curr_positions = curr_positions[:1]
-        curr_momentums = curr_momentums[:1]
-        target_positions = target_positions[:1]
-        target_momentums = target_momentums[:1]
         (predicted_positions, predicted_momentums, _,) = train.compute_predictions(
             state, curr_positions, curr_momentums, jump * config.time_delta
         )
@@ -326,12 +322,30 @@ def get_performance_against_time(workdir: str) -> Dict[int, chex.Numeric]:
             target_positions,
             target_momentums,
             time_deltas=config.time_delta,
+            auxiliary_predictions=None,
         )
     return errors
 
 
-def get_true_trajectories(workdir: str, jump: int) -> Dict[int, chex.Numeric]:
-    """Returns true trajectories."""
+def get_train_trajectories(workdir: str, jump: int) -> Tuple[chex.Array, chex.Array]:
+    """Returns train trajectories."""
+
+    _, scaler, _, aux = load_from_workdir(workdir)
+    train_positions = aux["train"]["positions"]
+    train_momentums = aux["train"]["momentums"]
+    (
+        _,
+        _,
+        target_positions,
+        target_momentums,
+    ) = train.get_coordinates_for_time_jump(train_positions, train_momentums, jump)
+    return train.inverse_transform_with_scaler(
+        target_positions, target_momentums, scaler
+    )
+
+
+def get_test_trajectories(workdir: str, jump: int) -> Tuple[chex.Array, chex.Array]:
+    """Returns test trajectories."""
 
     _, scaler, _, aux = load_from_workdir(workdir)
     test_positions = aux["test"]["positions"]
@@ -347,8 +361,10 @@ def get_true_trajectories(workdir: str, jump: int) -> Dict[int, chex.Numeric]:
     )
 
 
-def get_predicted_trajectories(workdir: str, jump: int) -> Dict[int, chex.Numeric]:
-    """Returns predicted trajectories."""
+def get_one_step_predicted_trajectories(
+    workdir: str, jump: int
+) -> Tuple[chex.Array, chex.Array]:
+    """Returns one-step predicted test trajectories."""
 
     config, scaler, state, aux = load_from_workdir(workdir)
     test_positions = aux["test"]["positions"]
@@ -361,6 +377,48 @@ def get_predicted_trajectories(workdir: str, jump: int) -> Dict[int, chex.Numeri
     (predicted_positions, predicted_momentums, _,) = train.compute_predictions(
         state, curr_positions, curr_momentums, jump * config.time_delta
     )
+    return train.inverse_transform_with_scaler(
+        predicted_positions, predicted_momentums, scaler
+    )
+
+
+def get_recursive_multi_step_predicted_trajectories(
+    workdir: str, jump: int
+) -> Tuple[chex.Array, chex.Array]:
+    """Returns recursive multi-step predicted test trajectories."""
+
+    def recursive_predict_next_step(carry, _):
+        current_position, current_momentum = carry
+        (
+            predicted_position,
+            predicted_momentum,
+            auxiliary_predictions,
+        ) = train.compute_predictions(
+            state, current_position, current_momentum, jump * config.time_delta
+        )
+        return (predicted_position, predicted_momentum), (
+            predicted_position,
+            predicted_momentum,
+            auxiliary_predictions,
+        )
+
+    config, scaler, state, aux = load_from_workdir(workdir)
+    test_positions = aux["test"]["positions"]
+    test_momentums = aux["test"]["momentums"]
+    (
+        curr_positions,
+        curr_momentums,
+        *_,
+    ) = train.get_coordinates_for_time_jump(test_positions, test_momentums, jump)
+    _, (predicted_positions, predicted_momentums, _) = jax.lax.scan(
+        recursive_predict_next_step,
+        (curr_positions[:1], curr_momentums[:1]),
+        None,
+        length=curr_positions.shape[0],
+    )
+    predicted_positions, predicted_momentums = predicted_positions.squeeze(
+        axis=1
+    ), predicted_momentums.squeeze(axis=1)
     return train.inverse_transform_with_scaler(
         predicted_positions, predicted_momentums, scaler
     )

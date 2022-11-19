@@ -38,11 +38,14 @@ def load_trajectory(molecule: str, num_samples: int, resample: bool):
     molecule_path = os.path.join(_MD17_BASE_PATH, f"rmd17_{molecule}.npz")
     with np.load(molecule_path) as data:
         indices = data["old_indices"]
+        print("indices", indices, len(indices))
+        return
         timesteps = np.sort(indices)[: num_samples + 1]
         indices = np.argsort(indices)[: num_samples + 1]
         positions = data["coords"][indices]
         nuclear_charges = data["nuclear_charges"]
 
+    print(positions.shape)
     # Resample with uniform time sampling.
     if resample:
         positions_fn = scipy.interpolate.interp1d(

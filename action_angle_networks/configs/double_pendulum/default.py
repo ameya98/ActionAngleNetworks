@@ -22,14 +22,14 @@ def get_config() -> ml_collections.ConfigDict:
     """Returns a training configuration."""
     config = ml_collections.ConfigDict()
     config.rng_seed = 0
-    config.num_trajectories = 1
-    config.dimensions_per_trajectory = 2
+    config.num_trajectories = 2
+    config.dimensions_per_trajectory = 1
     config.single_step_predictions = True
     config.num_samples = 1000
     config.split_on = "times"
     config.train_split_proportion = 100 / 1000
     config.test_split_proportion = 500 / 1000
-    config.time_delta = 1.0
+    config.time_delta = 0.01
     config.train_time_jump_schedule = "linear"
     config.train_time_jump_range = (1, 10)
     config.test_time_jumps = (1, 2, 5, 10, 20, 50)
@@ -40,12 +40,12 @@ def get_config() -> ml_collections.ConfigDict:
     config.regularizations = ml_collections.ConfigDict()
     config.simulation_parameter_ranges = ml_collections.ConfigDict(
         {
-            "l_1": (0.5,),
-            "l_2": (0.5,),
-            "m_1": (0.5,),
-            "m_2": (0.5,),
-            "theta_1_init": (0.5,),
-            "theta_2_init": (0.5,),
+            "l1": (1.0,),
+            "l2": (1.0,),
+            "m1": (1.0,),
+            "m2": (0.1,),
+            "theta1_init": (0.5,),
+            "theta2_init": (1.0,),
         }
     )
     return config

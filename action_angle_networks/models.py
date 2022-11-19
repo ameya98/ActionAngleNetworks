@@ -934,6 +934,7 @@ class NeuralODE(flax.struct.PyTreeNode):
 
 
 class HamiltonianNetWrapper(nn.Module):
+    """Wraps the Hamiltonian network part of the Hamiltonian Neural Network."""
 
     model: nn.Module
 

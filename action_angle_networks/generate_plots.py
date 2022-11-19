@@ -30,7 +30,7 @@ def get_label_from_config(config: str) -> str:
         return "Neural ODE"
 
     if config == "hamiltonian_neural_network":
-        return "Hamiltonian Neural Network"
+        return "HNN"
 
     raise ValueError(f"Unsupported config: {config}")
 
@@ -40,7 +40,7 @@ def get_dirs_for_plot_trajectories(
     simulation: str,
     num_train_samples: int,
 ) -> Tuple[Dict[str, str], str]:
-    """Returns input and output directories for the inference times plot, for this config."""
+    """Returns input and output directories for the trajectories plot for a list of configs."""
     if simulation == "harmonic_motion":
 
         def get_input_dir_for_config(config: str) -> str:
@@ -140,7 +140,7 @@ def plot_inference_times(input_dirs: Dict[str, str], output_dir: str) -> None:
                 label=get_label_from_config(config),
             )
 
-        plt.legend(title="Model", title_fontsize="large", fontsize="large")
+        plt.legend(title="Model", title_fontsize="medium", fontsize="medium")
         plt.xlabel("Jump Size", fontsize="x-large")
         plt.ylabel("Inference Time\n(seconds)", fontsize="x-large")
         plt.yscale("log")
@@ -154,7 +154,7 @@ def get_dirs_for_plot_performance_against_time(
     """Returns input and output directories for the inference times plot, for this config."""
 
     def get_input_dir_for_config(config: str) -> str:
-        return f"/Users/ameyad/Documents/google-research/workdirs/local/performance_vs_samples/action_angle_networks/configs/harmonic_motion/{config}/k_pair=0.5/num_samples=100"
+        return f"/Users/ameyad/Documents/google-research/workdirs/supercloud/sweeps/harmonic_motion/harmonic_motion/performance_vs_samples/harmonic_motion/{config}.py/num_samples=1000/train_split_proportion=0.1/num_train_steps=50000/simulation_parameter_ranges.k_pair=0.5"
 
     output_dir = f"/Users/ameyad/Documents/google-research/paper/performance_vs_time/action_angle_networks/configs/harmonic_motion/k_pair=0.5/num_samples=100"
     return {config: get_input_dir_for_config(config) for config in configs}, output_dir
@@ -179,7 +179,7 @@ def plot_performance_against_time(input_dirs: Dict[str, str], output_dir: str) -
                 label=get_label_from_config(config),
             )
 
-        plt.legend(title="Model", title_fontsize="large", fontsize="large")
+        plt.legend(title="Model", title_fontsize="medium", fontsize="medium")
         plt.xlabel("Jump Size", fontsize="x-large")
         plt.ylabel("Prediction Error", fontsize="x-large")
         plt.xscale("log")
@@ -261,7 +261,7 @@ def get_dirs_for_plot_performance_against_samples(
         input_config_regex = f"/Users/ameyad/Documents/google-research/workdirs/supercloud/sweeps/harmonic_motion/harmonic_motion/performance_vs_samples/harmonic_motion/{config}.py/**/simulation_parameter_ranges.k_pair=1.0/config.yml"
         input_configs = glob.glob(input_config_regex, recursive=True)
         input_dirs = [os.path.dirname(input_config) for input_config in input_configs]
-        output_dir = f"/Users/ameyad/Documents/google-research/paper/performance_vs_samples/action_angle_networks/configs/harmonic_motion/{config}/k_pair=1.0"
+        output_dir = f"/Users/ameyad/Documents/google-research/paper/performance_vs_samples/action_angle_networks/configs/harmonic_motion/{config}/k_pair=0.5"
         return input_dirs, output_dir
     if simulation == "orbit":
         input_config_regex = f"/Users/ameyad/Documents/google-research/workdirs/supercloud/sweeps/orbit/orbit/performance_vs_samples/orbit/{config}.py/**/config.yml"
@@ -383,9 +383,14 @@ def main(argv: Sequence[str]) -> None:
     )
     plot_trajectories(*dirs, simulation="orbit", jump=1)
 
-    # Performance against time.
+    # Performance against time jumps.
     dirs = get_dirs_for_plot_performance_against_time(
-        configs=["action_angle_flow", "euler_update_flow", "neural_ode"]
+        configs=[
+            "action_angle_flow",
+            "euler_update_flow",
+            "neural_ode",
+            "hamiltonian_neural_network",
+        ]
     )
     plot_performance_against_time(*dirs)
 
@@ -401,13 +406,12 @@ def main(argv: Sequence[str]) -> None:
     plot_inference_times(*dirs)
 
     # Performance against parameters.
-    config = "action_angle_flow"
-    dirs = get_dirs_for_plot_performance_against_parameters(config)
-    plot_performance_against_parameters(*dirs)
-
-    config = "neural_ode"
-    dirs = get_dirs_for_plot_performance_against_parameters(config)
-    plot_performance_against_parameters(*dirs)
+    for config in [
+        "action_angle_flow",
+        "neural_ode",
+    ]:
+        dirs = get_dirs_for_plot_performance_against_parameters(config)
+        plot_performance_against_parameters(*dirs)
 
     # Performance against training samples.
     for config in [
@@ -416,33 +420,18 @@ def main(argv: Sequence[str]) -> None:
         "neural_ode",
         "hamiltonian_neural_network",
     ]:
-        dirs = get_dirs_for_plot_performance_against_samples(config, "orbit")
+        dirs = get_dirs_for_plot_performance_against_samples(config, "harmonic_motion")
         plot_performance_against_samples(*dirs)
 
-    config = "action_angle_flow"
-    dirs = get_dirs_for_plot_performance_against_samples(config)
-    plot_performance_against_samples(*dirs)
-
-    config = "euler_update_flow"
-    dirs = get_dirs_for_plot_performance_against_samples(config)
-    plot_performance_against_samples(*dirs)
-
-    config = "neural_ode"
-    dirs = get_dirs_for_plot_performance_against_samples(config)
-    plot_performance_against_samples(*dirs)
-
     # Performance against training steps.
-    config = "action_angle_flow"
-    dirs = get_dirs_for_plot_performance_against_steps(config)
-    plot_performance_against_steps(*dirs)
-
-    config = "euler_update_flow"
-    dirs = get_dirs_for_plot_performance_against_steps(config)
-    plot_performance_against_steps(*dirs)
-
-    config = "neural_ode"
-    dirs = get_dirs_for_plot_performance_against_steps(config)
-    plot_performance_against_steps(*dirs)
+    for config in [
+        "action_angle_flow",
+        "euler_update_flow",
+        "neural_ode",
+        "hamiltonian_neural_network",
+    ]:
+        dirs = get_dirs_for_plot_performance_against_steps(config)
+        plot_performance_against_steps(*dirs)
 
 
 if __name__ == "__main__":
