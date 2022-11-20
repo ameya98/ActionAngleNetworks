@@ -4,6 +4,8 @@ import glob
 import os
 from typing import Dict, List, Sequence, Tuple
 
+import jax
+
 import matplotlib.pyplot as plt
 import numpy as np
 from absl import app
@@ -35,7 +37,7 @@ def get_label_from_config(config: str) -> str:
     raise ValueError(f"Unsupported config: {config}")
 
 
-def get_dirs_for_plot_trajectories(
+def get_dirs_for_plot_static_trajectories(
     configs: Sequence[str],
     simulation: str,
     num_train_samples: int,
@@ -44,9 +46,9 @@ def get_dirs_for_plot_trajectories(
     if simulation == "harmonic_motion":
 
         def get_input_dir_for_config(config: str) -> str:
-            return f"/Users/ameyad/Documents/google-research/workdirs/supercloud/sweeps/harmonic_motion/harmonic_motion/performance_vs_samples/harmonic_motion/{config}.py/num_samples=1000/train_split_proportion={num_train_samples / 1000}/num_train_steps=50000/simulation_parameter_ranges.k_pair=0.1"
+            return f"/Users/ameyad/Documents/google-research/workdirs/supercloud/sweeps/harmonic_motion/harmonic_motion/performance_vs_samples/harmonic_motion/{config}.py/num_samples=1000/train_split_proportion={num_train_samples / 1000}/num_train_steps=50000/simulation_parameter_ranges.k_pair=0.5"
 
-        output_dir = f"/Users/ameyad/Documents/google-research/paper/trajectories/action_angle_networks/configs/harmonic_motion/k_pair=0.1/num_train_samples={num_train_samples}"
+        output_dir = f"/Users/ameyad/Documents/google-research/paper/static_trajectories/action_angle_networks/configs/harmonic_motion/k_pair=0.5/num_train_samples={num_train_samples}"
         return {
             config: get_input_dir_for_config(config) for config in configs
         }, output_dir
@@ -56,16 +58,20 @@ def get_dirs_for_plot_trajectories(
         def get_input_dir_for_config(config: str) -> str:
             return f"/Users/ameyad/Documents/google-research/workdirs/supercloud/sweeps/orbit/orbit/performance_vs_samples/orbit/{config}.py/num_samples=1000/train_split_proportion={num_train_samples / 1000}/num_train_steps=50000/"
 
-        output_dir = f"/Users/ameyad/Documents/google-research/paper/trajectories/action_angle_networks/configs/orbit/num_train_samples={num_train_samples}"
+        output_dir = f"/Users/ameyad/Documents/google-research/paper/static_trajectories/action_angle_networks/configs/orbit/num_train_samples={num_train_samples}"
         return {
             config: get_input_dir_for_config(config) for config in configs
         }, output_dir
 
 
-def plot_trajectories(
-    input_dirs: Dict[str, str], output_dir: str, simulation: str, jump: int
+def plot_static_trajectories(
+    input_dirs: Dict[str, str],
+    output_dir: str,
+    simulation: str,
+    jump: int,
+    transparent: bool = False,
 ) -> None:
-    """Plots test performance against number of training samples."""
+    """Plots a static view of the trajectories."""
     output_dir = os.path.join(output_dir, f"jump={jump}")
     os.makedirs(output_dir, exist_ok=True)
 
@@ -83,10 +89,12 @@ def plot_trajectories(
     with plt.style.context(PLT_STYLE_CONTEXT):
         # Choose one of the input directories to plot the true trajectories.
         input_dir = next(iter(input_dirs.values()))
-        test_positions, test_momentums = analysis.get_true_trajectories(input_dir, jump)
+        test_positions, test_momentums, _ = analysis.get_test_trajectories(
+            input_dir, jump
+        )
         plot_coordinates_fn(
-            test_positions,
-            test_momentums,
+            test_positions[:200],
+            test_momentums[:200],
             title="True Trajectory",
             fig=fig,
             ax=axs[0],
@@ -97,17 +105,162 @@ def plot_trajectories(
             (
                 predicted_positions,
                 predicted_momentums,
-            ) = analysis.get_predicted_trajectories(input_dir, jump)
+                _,
+            ) = analysis.get_recursive_multi_step_predicted_trajectories(
+                input_dir, jump
+            )
             plot_coordinates_fn(
-                predicted_positions,
-                predicted_momentums,
+                predicted_positions[:200],
+                predicted_momentums[:200],
                 title=get_label_from_config(config),
                 fig=fig,
                 ax=ax,
+                max_position=np.abs(test_positions[:200]).max(),
+                max_momentum=np.abs(test_momentums[:200]).max(),
             )
 
-        fig.suptitle(f"Predictions for Jump Size: {jump}", y=0.9, fontsize=18)
-        fig.savefig(os.path.join(output_dir, "trajectories.pdf"))
+        # fig.suptitle(f"Predictions for Jump Size: {jump}", y=0.9, fontsize=18)
+        # fig.suptitle(f"True Trajectory and Model Predictions", y=0.9, fontsize=18)
+        print("Transparent:", transparent)
+        fig.savefig(
+            os.path.join(output_dir, "recursive_multi_step_trajectories.pdf"),
+            transparent=transparent,
+        )
+
+
+def get_dirs_for_plot_static_trajectory(
+    config: str, num_train_samples: int
+) -> Tuple[Dict[str, str], str]:
+    """Returns input and output directories for the inference times plot, for this config."""
+
+    input_dir = f"/Users/ameyad/Documents/google-research/workdirs/supercloud/sweeps/harmonic_motion/harmonic_motion/performance_vs_samples/harmonic_motion/{config}.py/num_samples=1000/train_split_proportion={num_train_samples / 1000}/num_train_steps=50000/simulation_parameter_ranges.k_pair=0.5"
+    output_dir = f"/Users/ameyad/Documents/google-research/paper/single_static_trajectories/action_angle_networks/configs/harmonic_motion/num_samples=1000/train_split_proportion={num_train_samples / 1000}/num_train_steps=50000/k_pair=0.5/{config}"
+    return input_dir, output_dir
+
+
+def plot_static_trajectory(
+    input_dir: str,
+    output_dir: str,
+    simulation: str,
+    jump: int,
+    title: str,
+    plot_true_trajectory: bool = False,
+) -> None:
+    """Plots an animation of a single trajectory."""
+    output_dir = os.path.join(output_dir, f"jump={jump}")
+    os.makedirs(output_dir, exist_ok=True)
+
+    if simulation == "harmonic_motion":
+        plot_coordinates_fn = (
+            harmonic_motion_simulation.static_plot_coordinates_in_phase_space
+        )
+    else:
+        raise NotImplementedError
+
+    with plt.style.context(PLT_STYLE_CONTEXT):
+        test_positions, test_momentums, _ = analysis.get_test_trajectories(
+            input_dir, jump
+        )
+        (
+            predicted_positions,
+            predicted_momentums,
+            _,
+        ) = analysis.get_recursive_multi_step_predicted_trajectories(input_dir, jump)
+
+        # Plot true trajectory?
+        if plot_true_trajectory:
+            fig = plot_coordinates_fn(
+                test_positions[:200],
+                test_momentums[:200],
+                title=title,
+            )
+            fig.savefig(
+                os.path.join(output_dir, "test_trajectories.pdf"), transparent=True
+            )
+
+        # Plot predictions.
+        else:
+            fig = plot_coordinates_fn(
+                predicted_positions[:200],
+                predicted_momentums[:200],
+                title=title,
+                max_position=np.abs(test_positions[:200]).max(),
+                max_momentum=np.abs(test_momentums[:200]).max(),
+            )
+            fig.savefig(
+                os.path.join(
+                    output_dir, "recursive_multi_step_predicted_trajectories.pdf"
+                ),
+                transparent=True,
+            )
+
+
+def get_dirs_for_plot_animated_trajectory(
+    config: str, num_train_samples: int
+) -> Tuple[Dict[str, str], str]:
+    """Returns input and output directories for the inference times plot, for this config."""
+
+    input_dir = f"/Users/ameyad/Documents/google-research/workdirs/supercloud/sweeps/harmonic_motion/harmonic_motion/performance_vs_samples/harmonic_motion/{config}.py/num_samples=1000/train_split_proportion={num_train_samples / 1000}/num_train_steps=50000/simulation_parameter_ranges.k_pair=0.5"
+    output_dir = f"/Users/ameyad/Documents/google-research/paper/animated_trajectories/action_angle_networks/configs/harmonic_motion/{config}/num_samples=1000/train_split_proportion={num_train_samples / 1000}/num_train_steps=50000/k_pair=0.5"
+    return input_dir, output_dir
+
+
+def plot_animated_trajectory(
+    input_dir: str,
+    output_dir: str,
+    simulation: str,
+    jump: int,
+    title: str,
+    plot_true_trajectory: bool = False,
+) -> None:
+    """Plots an animation of a single trajectory."""
+    output_dir = os.path.join(output_dir, f"jump={jump}")
+    os.makedirs(output_dir, exist_ok=True)
+
+    if simulation == "harmonic_motion":
+        plot_coordinates_fn = harmonic_motion_simulation.plot_coordinates_in_phase_space
+
+    else:
+        raise NotImplementedError
+
+    with plt.style.context(PLT_STYLE_CONTEXT):
+        (
+            test_positions,
+            test_momentums,
+            true_hamiltonians,
+        ) = analysis.get_test_trajectories(input_dir, jump)
+        (
+            predicted_positions,
+            predicted_momentums,
+            hamiltonians,
+        ) = analysis.get_recursive_multi_step_predicted_trajectories(input_dir, jump)
+
+        # Plot true trajectory?
+        if plot_true_trajectory:
+            anim = plot_coordinates_fn(
+                test_positions[:200],
+                test_momentums[:200],
+                title=title,
+                hamiltonians=true_hamiltonians,
+            )
+            anim.save(os.path.join(output_dir, "test_trajectories.mp4"), dpi=500)
+
+        # Plot predictions.
+        else:
+            anim = plot_coordinates_fn(
+                predicted_positions[:200],
+                predicted_momentums[:200],
+                title=title,
+                hamiltonians=hamiltonians,
+                max_position=np.abs(test_positions[:200]).max(),
+                max_momentum=np.abs(test_momentums[:200]).max(),
+            )
+            anim.save(
+                os.path.join(
+                    output_dir, "recursive_multi_step_predicted_trajectories.mp4"
+                ),
+                dpi=500,
+            )
 
 
 def get_dirs_for_plot_inference_times(
@@ -122,7 +275,9 @@ def get_dirs_for_plot_inference_times(
     return {config: get_input_dir_for_config(config) for config in configs}, output_dir
 
 
-def plot_inference_times(input_dirs: Dict[str, str], output_dir: str) -> None:
+def plot_inference_times(
+    input_dirs: Dict[str, str], output_dir: str, transparent: bool = False
+) -> None:
     """Plots inference times against jump size."""
     os.makedirs(output_dir, exist_ok=True)
     colors = plt.cm.Dark2(np.linspace(0, 1, len(input_dirs)))
@@ -144,7 +299,13 @@ def plot_inference_times(input_dirs: Dict[str, str], output_dir: str) -> None:
         plt.xlabel("Jump Size", fontsize="x-large")
         plt.ylabel("Inference Time\n(seconds)", fontsize="x-large")
         plt.yscale("log")
-        plt.savefig(os.path.join(output_dir, "inference_times.pdf"))
+        if transparent:
+            plt.savefig(
+                os.path.join(output_dir, "inference_times_transparent.pdf"),
+                transparent=True,
+            )
+        else:
+            plt.savefig(os.path.join(output_dir, "inference_times.pdf"))
         plt.close()
 
 
@@ -160,7 +321,9 @@ def get_dirs_for_plot_performance_against_time(
     return {config: get_input_dir_for_config(config) for config in configs}, output_dir
 
 
-def plot_performance_against_time(input_dirs: Dict[str, str], output_dir: str) -> None:
+def plot_performance_against_time(
+    input_dirs: Dict[str, str], output_dir: str, transparent: bool = False
+) -> None:
     """Plots prediction errors against time."""
 
     os.makedirs(output_dir, exist_ok=True)
@@ -184,7 +347,13 @@ def plot_performance_against_time(input_dirs: Dict[str, str], output_dir: str) -
         plt.ylabel("Prediction Error", fontsize="x-large")
         plt.xscale("log")
         plt.yscale("log")
-        plt.savefig(os.path.join(output_dir, "prediction_error.pdf"))
+        if transparent:
+            plt.savefig(
+                os.path.join(output_dir, "prediction_error_transparent.pdf"),
+                transparent=True,
+            )
+        else:
+            plt.savefig(os.path.join(output_dir, "prediction_error.pdf"))
         plt.close()
 
 
@@ -370,18 +539,67 @@ def main(argv: Sequence[str]) -> None:
     if len(argv) > 1:
         raise app.UsageError("Too many command-line arguments.")
 
-    # Trajectories.
-    dirs = get_dirs_for_plot_trajectories(
+    # Combined static trajectories.
+    dirs = get_dirs_for_plot_static_trajectories(
         configs=[
             "action_angle_flow",
-            "euler_update_flow",
+            # "euler_update_flow",
             "neural_ode",
             "hamiltonian_neural_network",
         ],
-        simulation="orbit",
-        num_train_samples=200,
+        simulation="harmonic_motion",
+        num_train_samples=100,
     )
-    plot_trajectories(*dirs, simulation="orbit", jump=1)
+    for jump in [1, 2, 5, 10]:
+        plot_static_trajectories(
+            *dirs, simulation="harmonic_motion", jump=jump, transparent=True
+        )
+
+    # Single static trajectories.
+    for config in [
+        "action_angle_flow",
+        "euler_update_flow",
+        "hamiltonian_neural_network",
+        "neural_ode",
+    ]:
+        dirs = get_dirs_for_plot_static_trajectory(config, num_train_samples=100)
+        plot_static_trajectory(
+            *dirs,
+            simulation="harmonic_motion",
+            jump=1,
+            title=get_label_from_config(config),
+        )
+        if config == "action_angle_flow":
+            plot_static_trajectory(
+                *dirs,
+                simulation="harmonic_motion",
+                jump=1,
+                title="True Trajectory",
+                plot_true_trajectory=True,
+            )
+
+    # Animated trajectories.
+    for config in [
+        "action_angle_flow",
+        "euler_update_flow",
+        "hamiltonian_neural_network",
+        "neural_ode",
+    ]:
+        dirs = get_dirs_for_plot_animated_trajectory(config, num_train_samples=100)
+        plot_animated_trajectory(
+            *dirs,
+            simulation="harmonic_motion",
+            jump=1,
+            title=get_label_from_config(config),
+        )
+        if config == "action_angle_flow":
+            plot_animated_trajectory(
+                *dirs,
+                simulation="harmonic_motion",
+                jump=1,
+                title="True Trajectory",
+                plot_true_trajectory=True,
+            )
 
     # Performance against time jumps.
     dirs = get_dirs_for_plot_performance_against_time(

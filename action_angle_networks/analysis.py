@@ -330,35 +330,47 @@ def get_performance_against_time(workdir: str) -> Dict[int, chex.Numeric]:
 def get_train_trajectories(workdir: str, jump: int) -> Tuple[chex.Array, chex.Array]:
     """Returns train trajectories."""
 
-    _, scaler, _, aux = load_from_workdir(workdir)
+    config, scaler, _, aux = load_from_workdir(workdir)
     train_positions = aux["train"]["positions"]
     train_momentums = aux["train"]["momentums"]
+    train_simulation_parameters = aux["train"]["simulation_parameters"]
     (
         _,
         _,
         target_positions,
         target_momentums,
     ) = train.get_coordinates_for_time_jump(train_positions, train_momentums, jump)
-    return train.inverse_transform_with_scaler(
+    target_positions, target_momentums = train.inverse_transform_with_scaler(
         target_positions, target_momentums, scaler
     )
+    hamiltonian_fn = train.get_compute_hamiltonian_fn(config)
+    hamiltonians = hamiltonian_fn(
+        target_positions, target_momentums, train_simulation_parameters
+    )
+    return target_positions, target_momentums, hamiltonians
 
 
 def get_test_trajectories(workdir: str, jump: int) -> Tuple[chex.Array, chex.Array]:
     """Returns test trajectories."""
 
-    _, scaler, _, aux = load_from_workdir(workdir)
+    config, scaler, _, aux = load_from_workdir(workdir)
     test_positions = aux["test"]["positions"]
     test_momentums = aux["test"]["momentums"]
+    test_simulation_parameters = aux["test"]["simulation_parameters"]
     (
         _,
         _,
         target_positions,
         target_momentums,
     ) = train.get_coordinates_for_time_jump(test_positions, test_momentums, jump)
-    return train.inverse_transform_with_scaler(
+    target_positions, target_momentums = train.inverse_transform_with_scaler(
         target_positions, target_momentums, scaler
     )
+    hamiltonian_fn = train.get_compute_hamiltonian_fn(config)
+    hamiltonians = hamiltonian_fn(
+        target_positions, target_momentums, test_simulation_parameters
+    )
+    return target_positions, target_momentums, hamiltonians
 
 
 def get_one_step_predicted_trajectories(
@@ -369,6 +381,7 @@ def get_one_step_predicted_trajectories(
     config, scaler, state, aux = load_from_workdir(workdir)
     test_positions = aux["test"]["positions"]
     test_momentums = aux["test"]["momentums"]
+    test_simulation_parameters = aux["test"]["simulation_parameters"]
     (
         curr_positions,
         curr_momentums,
@@ -377,9 +390,14 @@ def get_one_step_predicted_trajectories(
     (predicted_positions, predicted_momentums, _,) = train.compute_predictions(
         state, curr_positions, curr_momentums, jump * config.time_delta
     )
-    return train.inverse_transform_with_scaler(
+    predicted_positions, predicted_momentums = train.inverse_transform_with_scaler(
         predicted_positions, predicted_momentums, scaler
     )
+    hamiltonian_fn = train.get_compute_hamiltonian_fn(config)
+    hamiltonians = hamiltonian_fn(
+        predicted_positions, predicted_momentums, test_simulation_parameters
+    )
+    return predicted_positions, predicted_momentums, hamiltonians
 
 
 def get_recursive_multi_step_predicted_trajectories(
@@ -405,6 +423,7 @@ def get_recursive_multi_step_predicted_trajectories(
     config, scaler, state, aux = load_from_workdir(workdir)
     test_positions = aux["test"]["positions"]
     test_momentums = aux["test"]["momentums"]
+    test_simulation_parameters = aux["test"]["simulation_parameters"]
     (
         curr_positions,
         curr_momentums,
@@ -416,9 +435,13 @@ def get_recursive_multi_step_predicted_trajectories(
         None,
         length=curr_positions.shape[0],
     )
-    predicted_positions, predicted_momentums = predicted_positions.squeeze(
-        axis=1
-    ), predicted_momentums.squeeze(axis=1)
-    return train.inverse_transform_with_scaler(
+    predicted_positions = predicted_positions.squeeze(axis=1)
+    predicted_momentums = predicted_momentums.squeeze(axis=1)
+    predicted_positions, predicted_momentums = train.inverse_transform_with_scaler(
         predicted_positions, predicted_momentums, scaler
     )
+    hamiltonian_fn = train.get_compute_hamiltonian_fn(config)
+    hamiltonians = hamiltonian_fn(
+        predicted_positions, predicted_momentums, test_simulation_parameters
+    )
+    return predicted_positions, predicted_momentums, hamiltonians

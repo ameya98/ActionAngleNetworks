@@ -273,8 +273,8 @@ def plot_coordinates(
 def plot_coordinates_in_phase_space(
     positions: chex.Array,
     momentums: chex.Array,
-    simulation_parameters: Mapping[str, chex.Array],
     title: str,
+    hamiltonians: Optional[chex.Array] = None,
     max_position: Optional[chex.Numeric] = None,
     max_momentum: Optional[chex.Numeric] = None,
 ) -> animation.FuncAnimation:
@@ -289,21 +289,14 @@ def plot_coordinates_in_phase_space(
     assert qs.ndim == 2, f"Got positions of shape {qs.shape}."
     assert ps.ndim == 2, f"Got momentums of shape {ps.shape}."
 
-    # Create new Figure with black background
-    fig = plt.figure(figsize=(8, 6), facecolor="black")
-
     # Add a subplot.
-    ax = plt.subplot(facecolor="black")
-    pos = ax.get_position()
-    pos = [pos.x0, pos.y0 - 0.15, pos.width, pos.height]
-    ax.set_position(pos)
+    fig = plt.figure(figsize=(5, 4))
+    ax = plt.subplot(frameon=False)
 
     # Compute Hamiltonians.
     num_steps = qs.shape[0]
-    hs = jax.vmap(compute_hamiltonian, in_axes=(0, 0, None))(
-        qs, ps, simulation_parameters
-    )
-    hs_formatted = np.round(hs.squeeze(), 5)
+    if hamiltonians is not None:
+        hs_formatted = np.round(hamiltonians.squeeze(), 5)
 
     if max_position is None:
         q_max = np.max(np.abs(qs))
@@ -315,65 +308,68 @@ def plot_coordinates_in_phase_space(
     else:
         p_max = max_momentum
 
+    colors = plt.cm.inferno(np.linspace(0.1, 0.8, qs.shape[1]))
+
     def update(t):
-        # Update data
+        # Update data.
         ax.clear()
 
-        # 2 part titles to get different font weights
-        ax.text(
-            0.5,
-            0.83,
-            title + " ",
-            transform=fig.transFigure,
+        # Add title.
+        fig.text(
+            x=0.5,
+            y=1.0,
+            s=title,
             ha="center",
-            va="bottom",
-            color="w",
-            family="sans-serif",
-            fontweight="light",
+            va="center",
             fontsize=16,
-        )
-        ax.text(
-            0.5,
-            0.78,
-            "PHASE SPACE VISUALIZED",
-            transform=fig.transFigure,
-            ha="center",
-            va="bottom",
-            color="w",
-            family="sans-serif",
-            fontweight="bold",
-            fontsize=16,
+            transform=ax.transAxes,
         )
 
-        for qs_series, ps_series in zip(qs.T, ps.T):
+        for qs_series, ps_series, color in zip(qs.T, ps.T, colors):
             ax.plot(
                 qs_series,
                 ps_series,
                 marker="o",
                 markersize=2,
                 linestyle="None",
-                color="white",
+                zorder=1,
+                alpha=0.2,
+                color=color,
             )
-            ax.scatter(qs_series[t], ps_series[t], marker="o", s=40, color="white")
+            ax.scatter(
+                qs_series[t],
+                ps_series[t],
+                marker="o",
+                s=30,
+                zorder=2,
+                color=color,
+                edgecolors="black",
+            )
 
-        ax.text(
-            0, p_max * 1.7, r"$p$", ha="center", va="center", size=14, color="white"
+        ax.text(0, p_max * 1.65, r"$p$", ha="center", va="center", size=12)
+        ax.text(q_max * 1.6, 0, r"$q$", ha="center", va="center", size=12)
+
+        ax.plot(
+            [-q_max * 1.5, q_max * 1.5],
+            [0, 0],
+            linestyle="dashed",
+            color="black",
         )
-        ax.text(
-            q_max * 1.7, 0, r"$q$", ha="center", va="center", size=14, color="white"
+        ax.plot(
+            [0, 0],
+            [-p_max * 1.5, p_max * 1.5],
+            linestyle="dashed",
+            color="black",
         )
 
-        ax.plot([-q_max * 1.5, q_max * 1.5], [0, 0], linestyle="dashed", color="white")
-        ax.plot([0, 0], [-p_max * 1.5, p_max * 1.5], linestyle="dashed", color="white")
-
-        ax.annotate(
-            r"$H$ = %0.5f" % hs_formatted[t],
-            xy=(0, p_max * 2.4),
-            ha="center",
-            va="center",
-            size=14,
-            color="white",
-        )
+        if hamiltonians is not None:
+            ax.annotate(
+                r"$H$ = %0.5f" % hs_formatted[t],
+                xy=(0, p_max * 2),
+                ha="center",
+                va="center",
+                size=12,
+            )
 
         ax.set_xlim(-(q_max * 2), (q_max * 2))
         ax.set_ylim(-(p_max * 2.5), (p_max * 2.5))
@@ -427,7 +423,7 @@ def static_plot_coordinates_in_phase_space(
         s=title,
         ha="center",
         va="center",
-        fontsize=16,
+        fontsize=22,
         transform=ax.transAxes,
     )
 
@@ -440,9 +436,18 @@ def static_plot_coordinates_in_phase_space(
             markersize=2,
             linestyle="None",
             zorder=1,
+            alpha=0.5,
             color=color,
         )
-        ax.scatter(qs_series[0], ps_series[0], marker="o", s=30, zorder=2, color="gray")
+        ax.scatter(
+            qs_series[0],
+            ps_series[0],
+            marker="o",
+            s=30,
+            zorder=2,
+            color=color,
+            edgecolors="black",
+        )
 
     if max_position is None:
         q_max = np.max(np.abs(qs))
@@ -454,18 +459,18 @@ def static_plot_coordinates_in_phase_space(
     else:
         p_max = max_momentum
 
-    ax.text(0, p_max * 1.65, r"$p$", ha="center", va="center", size=14)
-    ax.text(q_max * 1.6, 0, r"$q$", ha="center", va="center", size=14)
+    ax.text(0, p_max * 1.4, r"$p$", ha="center", va="center", size=20)
+    ax.text(q_max * 1.35, 0, r"$q$", ha="center", va="center", size=20)
 
     ax.plot(
-        [-q_max * 1.5, q_max * 1.5],
+        [-q_max * 1.2, q_max * 1.2],
         [0, 0],
         linestyle="dashed",
         color="black",
     )
     ax.plot(
         [0, 0],
-        [-p_max * 1.5, p_max * 1.5],
+        [-p_max * 1.2, p_max * 1.2],
         linestyle="dashed",
         color="black",
     )
