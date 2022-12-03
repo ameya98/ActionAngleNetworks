@@ -5,7 +5,7 @@
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 
 
-The official JAX implementation of Action-Angle Networks.
+The official JAX implementation of Action-Angle Networks from our paper ["Learning Integrable Dynamics with Action-Angle Networks"](https://arxiv.org/abs/2211.15338).
 
 ### Instructions
 
@@ -56,3 +56,4 @@ This is a fork of [my original implementation here](https://github.com/google-re
 ## Code Authors
 
 Ameya Daigavane
+
