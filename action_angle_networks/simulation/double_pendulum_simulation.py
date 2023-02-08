@@ -280,11 +280,11 @@ def plot_coordinates(
         # Update data
         ax.clear()
 
-        # 2 part titles to get different font weights
+        # Add title
         ax.text(
             0.5,
             0.83,
-            title + " ",
+            title,
             transform=fig.transFigure,
             ha="center",
             va="bottom",
@@ -340,7 +340,7 @@ def plot_coordinates(
 
         ax.annotate(
             r"$H$ = %0.5f" % hs_formatted[t],
-            xy=(0, y_max * 2.4),
+            xy=(0, 0.70),
             ha="center",
             va="center",
             size=14,

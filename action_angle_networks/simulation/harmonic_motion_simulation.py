@@ -163,8 +163,9 @@ def compute_hamiltonian(
 def plot_coordinates(
     positions: chex.Array,
     momentums: chex.Array,
-    simulation_parameters: Mapping[str, chex.Array],
-    title: str,
+    hamiltonians: Optional[chex.Array] = None,
+    simulation_parameters: Optional[Mapping[str, chex.Array]] = None,
+    title: Optional[str] = None,
 ) -> animation.FuncAnimation:
     """Plots coordinates in the canonical basis."""
     assert len(positions) == len(momentums)
@@ -177,75 +178,65 @@ def plot_coordinates(
     assert qs.ndim == 2, f"Got positions of shape {qs.shape}."
     assert ps.ndim == 2, f"Got momentums of shape {ps.shape}."
 
-    # Create new Figure with black background
-    fig = plt.figure(figsize=(8, 6), facecolor="black")
-
-    # Add a subplot with no frame
+    # Create subplot.
+    fig = plt.figure(figsize=(8, 6))
     ax = plt.subplot(frameon=False)
 
-    # Compute Hamiltonians.
     num_steps = qs.shape[0]
     q_max = np.max(np.abs(qs))
     p_max = np.max(np.abs(ps))
     p_scale = (q_max / p_max) / 5
-    hs = jax.vmap(compute_hamiltonian, in_axes=(0, 0, None))(
-        qs, ps, simulation_parameters
-    )
+    if hamiltonians is not None:
+        hs = hamiltonians
+    elif simulation_parameters is not None:
+        hs = jax.vmap(compute_hamiltonian, in_axes=(0, 0, None))(
+            qs, ps, simulation_parameters
+        )
     hs_formatted = np.round(hs.squeeze(), 5)
 
     def update(t):
         # Update data
         ax.clear()
 
-        # 2 part titles to get different font weights
-        ax.text(
-            0.5,
-            1.0,
-            title + " ",
-            transform=ax.transAxes,
+        # Title.
+        fig.text(
+            x=0.5,
+            y=0.5,
+            s=title,
             ha="center",
-            va="bottom",
-            color="w",
-            family="sans-serif",
-            fontweight="light",
+            va="center",
             fontsize=16,
-        )
-        ax.text(
-            0.5,
-            0.93,
-            "VISUALIZED",
             transform=ax.transAxes,
-            ha="center",
-            va="bottom",
-            color="w",
-            family="sans-serif",
-            fontweight="bold",
-            fontsize=16,
         )
 
         for qs_series, ps_series in zip(qs.T, ps.T):
-            ax.scatter(qs_series[t], 10, marker="o", s=40, color="white")
-            ax.annotate(
-                r"$q$",
-                xy=(qs_series[t], 8),
-                ha="center",
-                va="center",
-                size=12,
-                color="white",
+            ax.scatter(
+                qs_series[t],
+                y=10,
+                marker="o",
+                edgecolors="black",
+                s=40,
+                zorder=0,
             )
-            ax.annotate(
-                r"$p$",
-                xy=(qs_series[t], 10 - 0.15),
-                xytext=(qs_series[t] + ps_series[t] * p_scale, 10 - 0.15),
-                arrowprops=dict(arrowstyle="<-", color="white"),
-                ha="center",
-                va="center",
-                size=12,
-                color="white",
-            )
+            # ax.annotate(
+            #     r"$q$",
+            #     xy=(qs_series[t], 8),
+            #     ha="center",
+            #     va="center",
+            #     size=12,
+            # )
+            # ax.annotate(
+            #     r"$p$",
+            #     xy=(qs_series[t], 10 - 0.15),
+            #     xytext=(qs_series[t] + ps_series[t] * p_scale, 10 - 0.15),
+            #     arrowprops=dict(arrowstyle="<-", color="gray"),
+            #     ha="center",
+            #     va="center",
+            #     size=12,
+            #     color="gray",
+            # )
 
-        ax.plot([0, 0], [5, 15], linestyle="dashed", color="white")
-
+        ax.plot([0, 0], [5, 15], linestyle="dashed", color="gray")
         ax.annotate(
             r"$H$ = %0.5f" % hs_formatted[t],
             xy=(0, 40),
@@ -266,6 +257,7 @@ def plot_coordinates(
     anim = animation.FuncAnimation(
         fig, update, frames=num_steps, interval=100, blit=False
     )
+    plt.tight_layout()
     plt.close()
     return anim
 
@@ -290,7 +282,7 @@ def plot_coordinates_in_phase_space(
     assert ps.ndim == 2, f"Got momentums of shape {ps.shape}."
 
     # Add a subplot.
-    fig = plt.figure(figsize=(5, 4))
+    fig = plt.figure(figsize=(4, 3))
     ax = plt.subplot(frameon=False)
 
     # Compute Hamiltonians.

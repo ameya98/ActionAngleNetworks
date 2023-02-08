@@ -196,12 +196,15 @@ def plot_static_trajectory(
 
 
 def get_dirs_for_plot_animated_trajectory(
-    config: str, num_train_samples: int
+    config: str, num_train_samples: int, plot_phase_space: bool
 ) -> Tuple[Dict[str, str], str]:
     """Returns input and output directories for the inference times plot, for this config."""
-
+    if plot_phase_space:
+        plot_type = "phase"
+    else:
+        plot_type = "original"
     input_dir = f"/Users/ameyad/Documents/google-research/workdirs/supercloud/sweeps/harmonic_motion/harmonic_motion/performance_vs_samples/harmonic_motion/{config}.py/num_samples=1000/train_split_proportion={num_train_samples / 1000}/num_train_steps=50000/simulation_parameter_ranges.k_pair=0.5"
-    output_dir = f"/Users/ameyad/Documents/google-research/paper/animated_trajectories/action_angle_networks/configs/harmonic_motion/{config}/num_samples=1000/train_split_proportion={num_train_samples / 1000}/num_train_steps=50000/k_pair=0.5"
+    output_dir = f"/Users/ameyad/Documents/google-research/paper/animated_trajectories/action_angle_networks/configs/harmonic_motion/{config}/num_samples=1000/train_split_proportion={num_train_samples / 1000}/num_train_steps=50000/k_pair=0.5/{plot_type}"
     return input_dir, output_dir
 
 
@@ -212,14 +215,19 @@ def plot_animated_trajectory(
     jump: int,
     title: str,
     plot_true_trajectory: bool = False,
+    plot_phase_space: bool = True,
 ) -> None:
     """Plots an animation of a single trajectory."""
     output_dir = os.path.join(output_dir, f"jump={jump}")
     os.makedirs(output_dir, exist_ok=True)
 
     if simulation == "harmonic_motion":
-        plot_coordinates_fn = harmonic_motion_simulation.plot_coordinates_in_phase_space
-
+        if plot_phase_space:
+            plot_coordinates_fn = (
+                harmonic_motion_simulation.plot_coordinates_in_phase_space
+            )
+        else:
+            plot_coordinates_fn = harmonic_motion_simulation.plot_coordinates
     else:
         raise NotImplementedError
 
@@ -241,7 +249,6 @@ def plot_animated_trajectory(
                 test_positions[:200],
                 test_momentums[:200],
                 title=title,
-                hamiltonians=true_hamiltonians,
             )
             anim.save(os.path.join(output_dir, "test_trajectories.mp4"), dpi=500)
 
@@ -251,7 +258,6 @@ def plot_animated_trajectory(
                 predicted_positions[:200],
                 predicted_momentums[:200],
                 title=title,
-                hamiltonians=hamiltonians,
                 max_position=np.abs(test_positions[:200]).max(),
                 max_momentum=np.abs(test_momentums[:200]).max(),
             )
@@ -539,44 +545,118 @@ def main(argv: Sequence[str]) -> None:
     if len(argv) > 1:
         raise app.UsageError("Too many command-line arguments.")
 
-    # Combined static trajectories.
-    dirs = get_dirs_for_plot_static_trajectories(
-        configs=[
-            "action_angle_flow",
-            # "euler_update_flow",
-            "neural_ode",
-            "hamiltonian_neural_network",
-        ],
-        simulation="harmonic_motion",
-        num_train_samples=100,
-    )
-    for jump in [1, 2, 5, 10]:
-        plot_static_trajectories(
-            *dirs, simulation="harmonic_motion", jump=jump, transparent=True
-        )
+    # # Combined static trajectories.
+    # dirs = get_dirs_for_plot_static_trajectories(
+    #     configs=[
+    #         "action_angle_flow",
+    #         # "euler_update_flow",
+    #         "neural_ode",
+    #         "hamiltonian_neural_network",
+    #     ],
+    #     simulation="harmonic_motion",
+    #     num_train_samples=100,
+    # )
+    # for jump in [1, 2, 5, 10]:
+    #     plot_static_trajectories(
+    #         *dirs, simulation="harmonic_motion", jump=jump, transparent=True
+    #     )
 
-    # Single static trajectories.
-    for config in [
-        "action_angle_flow",
-        "euler_update_flow",
-        "hamiltonian_neural_network",
-        "neural_ode",
-    ]:
-        dirs = get_dirs_for_plot_static_trajectory(config, num_train_samples=100)
-        plot_static_trajectory(
-            *dirs,
-            simulation="harmonic_motion",
-            jump=1,
-            title=get_label_from_config(config),
-        )
-        if config == "action_angle_flow":
-            plot_static_trajectory(
-                *dirs,
-                simulation="harmonic_motion",
-                jump=1,
-                title="True Trajectory",
-                plot_true_trajectory=True,
-            )
+    # # Single static trajectories.
+    # for config in [
+    #     "action_angle_flow",
+    #     "euler_update_flow",
+    #     "hamiltonian_neural_network",
+    #     "neural_ode",
+    # ]:
+    #     dirs = get_dirs_for_plot_static_trajectory(config, num_train_samples=100)
+    #     plot_static_trajectory(
+    #         *dirs,
+    #         simulation="harmonic_motion",
+    #         jump=1,
+    #         title=get_label_from_config(config),
+    #     )
+    #     if config == "action_angle_flow":
+    #         plot_static_trajectory(
+    #             *dirs,
+    #             simulation="harmonic_motion",
+    #             jump=1,
+    #             title="True Trajectory",
+    #             plot_true_trajectory=True,
+    #         )
+
+    # # Animated trajectories.
+    # for config in [
+    #     "action_angle_flow",
+    #     "euler_update_flow",
+    #     "hamiltonian_neural_network",
+    #     "neural_ode",
+    # ]:
+    #     dirs = get_dirs_for_plot_animated_trajectory(config, num_train_samples=100, plot_phase_space=True)
+    #     plot_animated_trajectory(
+    #         *dirs,
+    #         simulation="harmonic_motion",
+    #         plot_phase_space=True,
+    #         jump=1,
+    #         title=get_label_from_config(config),
+    #     )
+    #     if config == "action_angle_flow":
+    #         plot_animated_trajectory(
+    #             *dirs,
+    #             simulation="harmonic_motion",
+    #             jump=1,
+    #             title="True Trajectory",
+    #             plot_true_trajectory=True,
+    #         )
+
+    # # Performance against time jumps.
+    # dirs = get_dirs_for_plot_performance_against_time(
+    #     configs=[
+    #         "action_angle_flow",
+    #         "euler_update_flow",
+    #         "neural_ode",
+    #         "hamiltonian_neural_network",
+    #     ]
+    # )
+    # plot_performance_against_time(*dirs)
+
+    # # Inference times.
+    # dirs = get_dirs_for_plot_inference_times(
+    #     configs=[
+    #         "action_angle_flow",
+    #         "euler_update_flow",
+    #         "hamiltonian_neural_network",
+    #         "neural_ode",
+    #     ]
+    # )
+    # plot_inference_times(*dirs)
+
+    # # Performance against parameters.
+    # for config in [
+    #     "action_angle_flow",
+    #     "neural_ode",
+    # ]:
+    #     dirs = get_dirs_for_plot_performance_against_parameters(config)
+    #     plot_performance_against_parameters(*dirs)
+
+    # # Performance against training samples.
+    # for config in [
+    #     "action_angle_flow",
+    #     "euler_update_flow",
+    #     "neural_ode",
+    #     "hamiltonian_neural_network",
+    # ]:
+    #     dirs = get_dirs_for_plot_performance_against_samples(config, "harmonic_motion")
+    #     plot_performance_against_samples(*dirs)
+
+    # # Performance against training steps.
+    # for config in [
+    #     "action_angle_flow",
+    #     "euler_update_flow",
+    #     "neural_ode",
+    #     "hamiltonian_neural_network",
+    # ]:
+    #     dirs = get_dirs_for_plot_performance_against_steps(config)
+    #     plot_performance_against_steps(*dirs)
 
     # Animated trajectories.
     for config in [
@@ -585,12 +665,15 @@ def main(argv: Sequence[str]) -> None:
         "hamiltonian_neural_network",
         "neural_ode",
     ]:
-        dirs = get_dirs_for_plot_animated_trajectory(config, num_train_samples=100)
+        dirs = get_dirs_for_plot_animated_trajectory(
+            config, num_train_samples=100, plot_phase_space=True
+        )
         plot_animated_trajectory(
             *dirs,
             simulation="harmonic_motion",
             jump=1,
             title=get_label_from_config(config),
+            plot_phase_space=True,
         )
         if config == "action_angle_flow":
             plot_animated_trajectory(
@@ -599,57 +682,8 @@ def main(argv: Sequence[str]) -> None:
                 jump=1,
                 title="True Trajectory",
                 plot_true_trajectory=True,
+                plot_phase_space=True,
             )
-
-    # Performance against time jumps.
-    dirs = get_dirs_for_plot_performance_against_time(
-        configs=[
-            "action_angle_flow",
-            "euler_update_flow",
-            "neural_ode",
-            "hamiltonian_neural_network",
-        ]
-    )
-    plot_performance_against_time(*dirs)
-
-    # Inference times.
-    dirs = get_dirs_for_plot_inference_times(
-        configs=[
-            "action_angle_flow",
-            "euler_update_flow",
-            "hamiltonian_neural_network",
-            "neural_ode",
-        ]
-    )
-    plot_inference_times(*dirs)
-
-    # Performance against parameters.
-    for config in [
-        "action_angle_flow",
-        "neural_ode",
-    ]:
-        dirs = get_dirs_for_plot_performance_against_parameters(config)
-        plot_performance_against_parameters(*dirs)
-
-    # Performance against training samples.
-    for config in [
-        "action_angle_flow",
-        "euler_update_flow",
-        "neural_ode",
-        "hamiltonian_neural_network",
-    ]:
-        dirs = get_dirs_for_plot_performance_against_samples(config, "harmonic_motion")
-        plot_performance_against_samples(*dirs)
-
-    # Performance against training steps.
-    for config in [
-        "action_angle_flow",
-        "euler_update_flow",
-        "neural_ode",
-        "hamiltonian_neural_network",
-    ]:
-        dirs = get_dirs_for_plot_performance_against_steps(config)
-        plot_performance_against_steps(*dirs)
 
 
 if __name__ == "__main__":

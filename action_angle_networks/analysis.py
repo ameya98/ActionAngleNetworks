@@ -327,8 +327,10 @@ def get_performance_against_time(workdir: str) -> Dict[int, chex.Numeric]:
     return errors
 
 
-def get_train_trajectories(workdir: str, jump: int) -> Tuple[chex.Array, chex.Array]:
-    """Returns train trajectories."""
+def get_train_trajectories(
+    workdir: str, jump: int
+) -> Tuple[chex.Array, chex.Array, chex.Array]:
+    """Returns train trajectories with computed Hamiltonians."""
 
     config, scaler, _, aux = load_from_workdir(workdir)
     train_positions = aux["train"]["positions"]
@@ -350,8 +352,10 @@ def get_train_trajectories(workdir: str, jump: int) -> Tuple[chex.Array, chex.Ar
     return target_positions, target_momentums, hamiltonians
 
 
-def get_test_trajectories(workdir: str, jump: int) -> Tuple[chex.Array, chex.Array]:
-    """Returns test trajectories."""
+def get_test_trajectories(
+    workdir: str, jump: int
+) -> Tuple[chex.Array, chex.Array, chex.Array]:
+    """Returns test trajectories with computed Hamiltonians."""
 
     config, scaler, _, aux = load_from_workdir(workdir)
     test_positions = aux["test"]["positions"]
@@ -375,8 +379,8 @@ def get_test_trajectories(workdir: str, jump: int) -> Tuple[chex.Array, chex.Arr
 
 def get_one_step_predicted_trajectories(
     workdir: str, jump: int
-) -> Tuple[chex.Array, chex.Array]:
-    """Returns one-step predicted test trajectories."""
+) -> Tuple[chex.Array, chex.Array, chex.Array]:
+    """Returns one-step predicted test trajectories with computed Hamiltonians."""
 
     config, scaler, state, aux = load_from_workdir(workdir)
     test_positions = aux["test"]["positions"]
@@ -402,8 +406,8 @@ def get_one_step_predicted_trajectories(
 
 def get_recursive_multi_step_predicted_trajectories(
     workdir: str, jump: int
-) -> Tuple[chex.Array, chex.Array]:
-    """Returns recursive multi-step predicted test trajectories."""
+) -> Tuple[chex.Array, chex.Array, chex.Array]:
+    """Returns recursive multi-step predicted test trajectories with computed Hamiltonians."""
 
     def recursive_predict_next_step(carry, _):
         current_position, current_momentum = carry

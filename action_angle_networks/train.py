@@ -294,7 +294,7 @@ def compute_loss(
     loss = optax.l2_loss(predictions=predicted_positions, targets=target_positions)
     loss += optax.l2_loss(predictions=predicted_momentums, targets=target_momentums)
     loss = jnp.mean(loss)
-    loss /= 1 + jnp.mean(time_deltas)
+    # loss /= 1 + jnp.mean(time_deltas)
 
     if auxiliary_predictions is not None:
         angular_velocities = auxiliary_predictions["angular_velocities"]
@@ -672,17 +672,51 @@ def get_time_deltas_fn(config: ml_collections.ConfigDict) -> Callable[[int], flo
     return lambda jump: jnp.arange(1, jump + 1) * config.time_delta
 
 
-@functools.partial(jax.jit, static_argnames="index")
-def get_trajectory_with_parameters(
-    index: int,
-    positions: chex.Array,
-    momentums: chex.Array,
-    simulation_parameters: Dict[str, chex.Array],
-) -> Tuple[chex.Array, chex.Array, Dict[str, chex.Array]]:
-    """Gets the trajectory and simulation parameters for a particular index."""
-    return jax.tree_map(
-        lambda arr: arr[index], (positions, momentums, simulation_parameters)
-    )
+def get_noise_fn(
+    config: ml_collections.ConfigDict,
+) -> Callable[[chex.Array, chex.Array, chex.PRNGKey], Tuple[chex.Array, chex.Array]]:
+    """Returns a function that adds noise to inputs."""
+    noise_type = config.get("noise_type")
+    if noise_type is None:
+        return lambda positions, momentums, rng: (positions, momentums)
+
+    if config.noise_type == "uncorrelated":
+
+        def add_uncorrelated_noise(
+            positions: chex.Array, momentums: chex.Array, rng: chex.PRNGKey
+        ) -> Tuple[chex.Array, chex.Array]:
+            noise_std = config.noise_std
+            rng, positions_rng, momentums_rng = jax.random.split(rng, num=3)
+            positions_noise = (
+                jax.random.normal(positions_rng, positions.shape) * noise_std
+            )
+            momentums_noise = (
+                jax.random.normal(momentums_rng, momentums.shape) * noise_std
+            )
+            return (positions + positions_noise, momentums + momentums_noise)
+
+        return add_uncorrelated_noise
+
+    if config.noise_type == "random_walk":
+
+        def add_random_walk_noise(
+            positions: chex.Array, momentums: chex.Array, rng: chex.PRNGKey
+        ) -> Tuple[chex.Array, chex.Array]:
+            noise_std = config.noise_std
+            rng, positions_rng, momentums_rng = jax.random.split(rng, num=3)
+            positions_noise = (
+                jax.random.normal(positions_rng, positions.shape).cumsum(axis=0)
+                * noise_std
+            )
+            momentums_noise = (
+                jax.random.normal(momentums_rng, momentums.shape).cumsum(axis=0)
+                * noise_std
+            )
+            return (positions + positions_noise, momentums + momentums_noise)
+
+        return add_random_walk_noise
+
+    raise NotImplementedError(f"Unsupported config.noise_type: {config.noise_type}.")
 
 
 def train_and_evaluate(
@@ -707,6 +741,7 @@ def train_and_evaluate(
     generate_canonical_coordinates_fn = get_generate_canonical_coordinates_fn(config)
     compute_hamiltonian_fn = get_compute_hamiltonian_fn(config)
     sample_simulation_parameters_fn = get_sample_simulation_parameters_fn(config)
+    noise_fn = get_noise_fn(config)
 
     # Generate data.
     logging.info("Generating data.")
@@ -721,7 +756,6 @@ def train_and_evaluate(
     all_positions, all_momentums = generate_canonical_coordinates_fn(
         times, simulation_parameters
     )
-    print(all_positions[:5], all_momentums[:5])
     assert (
         len(all_positions.shape) == 2
     ), f"Received all_positions of shape: {all_positions.shape}"
@@ -803,6 +837,12 @@ def train_and_evaluate(
             train_target_momentums,
         ) = coordinates_fn(train_positions, train_momentums, jump)
         time_deltas = time_deltas_fn(jump)
+
+        # Add noise, if required.
+        step_rng, noise_rng = jax.random.split(step_rng)
+        train_curr_positions, train_curr_momentums = noise_fn(
+            train_curr_positions, train_curr_momentums, noise_rng
+        )
 
         # Sample indices.
         num_samples_on_trajectory = train_curr_positions.shape[0]

@@ -27,25 +27,41 @@ def get_config() -> ml_collections.ConfigDict:
     config.single_step_predictions = True
     config.num_samples = 1000
     config.split_on = "times"
-    config.train_split_proportion = 100 / 1000
+    config.train_split_proportion = 200 / 1000
     config.test_split_proportion = 500 / 1000
     config.time_delta = 0.01
-    config.train_time_jump_schedule = "linear"
-    config.train_time_jump_range = (1, 10)
+    config.train_time_jump_schedule = "constant"
+    config.train_time_jump = 5
     config.test_time_jumps = (1, 2, 5, 10, 20, 50)
     config.num_train_steps = 5000
     config.eval_cadence = 50
     config.scaler = "standard"
     config.simulation = "double_pendulum"
+    config.noise_type = "uncorrelated"
+    config.noise_std = 0.01
+    # config.noise_type = None
     config.regularizations = ml_collections.ConfigDict()
-    config.simulation_parameter_ranges = ml_collections.ConfigDict(
-        {
-            "l1": (1.0,),
-            "l2": (1.0,),
-            "m1": (1.0,),
-            "m2": (0.1,),
-            "theta1_init": (0.5,),
-            "theta2_init": (1.0,),
-        }
-    )
+    config.setup = 1
+    if config.setup == 1:
+        config.simulation_parameter_ranges = ml_collections.ConfigDict(
+            {
+                "l1": (0.5,),
+                "l2": (0.5,),
+                "m1": (0.5,),
+                "m2": (0.5,),
+                "theta1_init": (0.5,),
+                "theta2_init": (0.5,),
+            }
+        )
+    elif config.setup == 2:
+        config.simulation_parameter_ranges = ml_collections.ConfigDict(
+            {
+                "l1": (1.0,),
+                "l2": (1.0,),
+                "m1": (1.0,),
+                "m2": (0.1,),
+                "theta1_init": (0.5,),
+                "theta2_init": (1.0,),
+            }
+        )
     return config
