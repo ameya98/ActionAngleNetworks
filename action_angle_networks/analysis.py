@@ -62,11 +62,11 @@ def load_from_workdir(
             logging.info("Using loaded config directly...")
             config = loaded_config
     else:
-        if default_config is None:
-            raise ValueError("Please supply a value for default_config.")
         logging.info(
             f"No saved config found. Using default config: %s.", default_config
         )
+        if default_config is None:
+            raise ValueError("Please supply a value for default_config.")
         config = default_config
 
     assert config is not None

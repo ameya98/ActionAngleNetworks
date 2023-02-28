@@ -35,15 +35,15 @@ def get_config() -> ml_collections.ConfigDict:
     config.test_time_jumps = (1, 2, 5, 10, 20, 50)
     config.num_train_steps = 5000
     config.eval_cadence = 50
-    config.scaler = "standard"
+    config.scaler = "identity"
     config.simulation = "orbit"
     config.regularizations = ml_collections.ConfigDict()
     config.simulation_parameter_ranges = ml_collections.ConfigDict(
         {
             "t0": (0, 1),
-            "a": (1, 10),
+            "a": (2.0,),
             "m": (1, 5),
-            "e": (0.1, 0.2),
+            "e": (0.0,),
             "k": (1.0, 5.0),
         }
     )

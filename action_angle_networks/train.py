@@ -678,10 +678,11 @@ def get_noise_fn(
     """Returns a function that adds noise to inputs."""
     noise_type = config.get("noise_type")
     if noise_type is None:
-        return lambda positions, momentums, rng: (positions, momentums)
+        return jax.jit(lambda positions, momentums, rng: (positions, momentums))
 
     if config.noise_type == "uncorrelated":
 
+        @jax.jit
         def add_uncorrelated_noise(
             positions: chex.Array, momentums: chex.Array, rng: chex.PRNGKey
         ) -> Tuple[chex.Array, chex.Array]:
@@ -699,6 +700,7 @@ def get_noise_fn(
 
     if config.noise_type == "random_walk":
 
+        @jax.jit
         def add_random_walk_noise(
             positions: chex.Array, momentums: chex.Array, rng: chex.PRNGKey
         ) -> Tuple[chex.Array, chex.Array]:

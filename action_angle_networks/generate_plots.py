@@ -2,7 +2,7 @@
 
 import glob
 import os
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import jax
 
@@ -70,6 +70,7 @@ def plot_static_trajectories(
     simulation: str,
     jump: int,
     transparent: bool = False,
+    num_samples: int = 200,
 ) -> None:
     """Plots a static view of the trajectories."""
     output_dir = os.path.join(output_dir, f"jump={jump}")
@@ -87,14 +88,14 @@ def plot_static_trajectories(
     )
 
     with plt.style.context(PLT_STYLE_CONTEXT):
-        # Choose one of the input directories to plot the true trajectories.
+        # Choose one of the input directories to get the true trajectories.
         input_dir = next(iter(input_dirs.values()))
         test_positions, test_momentums, _ = analysis.get_test_trajectories(
             input_dir, jump
         )
         plot_coordinates_fn(
-            test_positions[:200],
-            test_momentums[:200],
+            test_positions[:num_samples],
+            test_momentums[:num_samples],
             title="True Trajectory",
             fig=fig,
             ax=axs[0],
@@ -110,18 +111,17 @@ def plot_static_trajectories(
                 input_dir, jump
             )
             plot_coordinates_fn(
-                predicted_positions[:200],
-                predicted_momentums[:200],
+                predicted_positions[:num_samples],
+                predicted_momentums[:num_samples],
                 title=get_label_from_config(config),
                 fig=fig,
                 ax=ax,
-                max_position=np.abs(test_positions[:200]).max(),
-                max_momentum=np.abs(test_momentums[:200]).max(),
+                max_position=np.abs(test_positions[:num_samples]).max(),
+                max_momentum=np.abs(test_momentums[:num_samples]).max(),
             )
 
         # fig.suptitle(f"Predictions for Jump Size: {jump}", y=0.9, fontsize=18)
         # fig.suptitle(f"True Trajectory and Model Predictions", y=0.9, fontsize=18)
-        print("Transparent:", transparent)
         fig.savefig(
             os.path.join(output_dir, "recursive_multi_step_trajectories.pdf"),
             transparent=transparent,
@@ -145,15 +145,27 @@ def plot_static_trajectory(
     jump: int,
     title: str,
     plot_true_trajectory: bool = False,
+    plot_phase_space: bool = True,
+    num_samples: int = 200,
 ) -> None:
     """Plots an animation of a single trajectory."""
     output_dir = os.path.join(output_dir, f"jump={jump}")
     os.makedirs(output_dir, exist_ok=True)
 
     if simulation == "harmonic_motion":
-        plot_coordinates_fn = (
-            harmonic_motion_simulation.static_plot_coordinates_in_phase_space
-        )
+        if plot_phase_space:
+            plot_coordinates_fn = (
+                harmonic_motion_simulation.static_plot_coordinates_in_phase_space
+            )
+        else:
+            raise NotImplementedError
+    elif simulation == "orbit":
+        if plot_phase_space:
+            plot_coordinates_fn = (
+                orbit_simulation.static_plot_coordinates_in_phase_space
+            )
+        else:
+            plot_coordinates_fn = orbit_simulation.static_plot_coordinates
     else:
         raise NotImplementedError
 
@@ -167,32 +179,36 @@ def plot_static_trajectory(
             _,
         ) = analysis.get_recursive_multi_step_predicted_trajectories(input_dir, jump)
 
-        # Plot true trajectory?
-        if plot_true_trajectory:
-            fig = plot_coordinates_fn(
-                test_positions[:200],
-                test_momentums[:200],
-                title=title,
-            )
-            fig.savefig(
-                os.path.join(output_dir, "test_trajectories.pdf"), transparent=True
-            )
-
-        # Plot predictions.
+        # Plot true trajectory.
+        if plot_phase_space:
+            output_file = "test_trajectories_phase_space.pdf"
         else:
-            fig = plot_coordinates_fn(
-                predicted_positions[:200],
-                predicted_momentums[:200],
-                title=title,
-                max_position=np.abs(test_positions[:200]).max(),
-                max_momentum=np.abs(test_momentums[:200]).max(),
-            )
-            fig.savefig(
-                os.path.join(
-                    output_dir, "recursive_multi_step_predicted_trajectories.pdf"
-                ),
-                transparent=True,
-            )
+            output_file = "test_trajectories.pdf"
+
+        fig = plot_coordinates_fn(
+            test_positions[:num_samples],
+            test_momentums[:num_samples],
+            title="Test Trajectory",
+        )
+        fig.savefig(os.path.join(output_dir, output_file), transparent=True)
+        plt.close()
+
+        # Plot predicted trajectory.
+        if plot_phase_space:
+            output_file = "recursive_multi_step_predicted_trajectories_phase_space.pdf"
+        else:
+            output_file = "recursive_multi_step_predicted_trajectories.pdf"
+
+        fig = plot_coordinates_fn(
+            predicted_positions[:num_samples],
+            predicted_momentums[:num_samples],
+            title=title,
+        )
+        fig.savefig(
+            os.path.join(output_dir, output_file),
+            transparent=True,
+        )
+    plt.close()
 
 
 def get_dirs_for_plot_animated_trajectory(
@@ -216,6 +232,7 @@ def plot_animated_trajectory(
     title: str,
     plot_true_trajectory: bool = False,
     plot_phase_space: bool = True,
+    num_samples: int = 200,
 ) -> None:
     """Plots an animation of a single trajectory."""
     output_dir = os.path.join(output_dir, f"jump={jump}")
@@ -246,20 +263,22 @@ def plot_animated_trajectory(
         # Plot true trajectory?
         if plot_true_trajectory:
             anim = plot_coordinates_fn(
-                test_positions[:200],
-                test_momentums[:200],
+                test_positions[:num_samples],
+                test_momentums[:num_samples],
                 title=title,
+                hamiltonians=true_hamiltonians,
             )
             anim.save(os.path.join(output_dir, "test_trajectories.mp4"), dpi=500)
 
         # Plot predictions.
         else:
             anim = plot_coordinates_fn(
-                predicted_positions[:200],
-                predicted_momentums[:200],
+                predicted_positions[:num_samples],
+                predicted_momentums[:num_samples],
                 title=title,
-                max_position=np.abs(test_positions[:200]).max(),
-                max_momentum=np.abs(test_momentums[:200]).max(),
+                max_position=np.abs(test_positions[:num_samples]).max(),
+                max_momentum=np.abs(test_momentums[:num_samples]).max(),
+                hamiltonians=hamiltonians,
             )
             anim.save(
                 os.path.join(
@@ -490,42 +509,54 @@ def plot_performance_against_samples(input_dirs: str, output_dir: str) -> None:
         plt.close()
 
 
-def get_dirs_for_plot_performance_against_steps(config: str) -> Tuple[str, str]:
+def get_dirs_for_plot_performance_against_steps(config: str) -> Tuple[List[str], str]:
     """Returns input and output directories for the performance against steps plot, for this config."""
-    input_dir = f"/Users/ameyad/Documents/google-research/workdirs/local/performance_vs_steps/action_angle_networks/configs/harmonic_motion/{config}/num_samples=100"
+    input_dirs = os.listdir(
+        f"/Users/ameyad/Documents/google-research/workdirs/local/performance_vs_steps/action_angle_networks/configs/harmonic_motion/{config}/num_samples=100"
+    )
     output_dir = f"/Users/ameyad/Documents/google-research/paper/performance_vs_steps/action_angle_networks/configs/harmonic_motion/{config}/num_samples=100"
-    return input_dir, output_dir
+    return input_dirs, output_dir
 
 
-def plot_performance_against_steps(input_dir: str, output_dir: str) -> None:
+def plot_performance_against_steps(
+    input_dirs: Sequence[str],
+    output_dirs: Sequence[str],
+    titles: Optional[Sequence[str]] = None,
+) -> None:
     """Plots test performance against number of training steps."""
+    if not len(input_dirs) == len(output_dirs):
+        raise ValueError("input_dirs and output_dirs must be the same length.")
 
-    for workdir in os.listdir(input_dir):
-        output_workdir = os.path.join(output_dir, workdir)
-        os.makedirs(output_workdir, exist_ok=True)
+    if titles is None:
+        titles = [None for _ in input_dirs]
 
-        full_workdir = os.path.join(input_dir, workdir)
+    for workdir, output_dir, title in zip(input_dirs, output_dirs, titles):
+        os.makedirs(output_dir, exist_ok=True)
         (
             prediction_losses,
             delta_hamiltonians,
             steps,
-        ) = analysis.get_performance_against_steps(full_workdir)
+        ) = analysis.get_performance_against_steps(workdir)
 
         jumps = sorted(delta_hamiltonians.keys())
+        jumps = [1, 2, 5]
         colors = plt.cm.viridis(np.linspace(0, 1, len(jumps)))
 
         with plt.style.context(PLT_STYLE_CONTEXT):
             for jump, color in zip(jumps, colors):
+                print(
+                    "jump",
+                    jump,
+                    len(delta_hamiltonians[jump]),
+                    np.max(np.abs(delta_hamiltonians[jump])),
+                )
                 plt.plot(steps, delta_hamiltonians[jump], label=jump, color=color)
 
             plt.xlabel("Training Steps", fontsize="x-large")
             plt.ylabel("Mean Relative \n Change in Hamiltonian", fontsize="x-large")
-            plt.yscale("log")
-            plt.ylim(1e-3, 1e4)
             plt.legend(title="Jump Size", title_fontsize="large", fontsize="large")
-            plt.savefig(
-                os.path.join(output_workdir, "relative_change_in_hamiltonian.pdf")
-            )
+            plt.title(title, fontsize="x-large")
+            plt.savefig(os.path.join(output_dir, "relative_change_in_hamiltonian.pdf"))
             plt.close()
 
         with plt.style.context(PLT_STYLE_CONTEXT):
@@ -537,7 +568,8 @@ def plot_performance_against_steps(input_dir: str, output_dir: str) -> None:
             plt.yscale("log")
             plt.ylim(5e-6, 1e3)
             plt.legend(title="Jump Size", title_fontsize="large", fontsize="large")
-            plt.savefig(os.path.join(output_workdir, "prediction_error.pdf"))
+            plt.title(title, fontsize="x-large")
+            plt.savefig(os.path.join(output_dir, "prediction_error.pdf"))
             plt.close()
 
 

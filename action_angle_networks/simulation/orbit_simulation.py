@@ -107,9 +107,9 @@ def generate_canonical_coordinates_for_trajectory(
     )
 
     # First, compute the eccentric_anomaly at this instant.
+    # We need to make an initial guess for the eccentric anomaly.
     period = (2 * jnp.pi * jnp.power(a, 1.5)) / jnp.sqrt(k)
     solver = jaxopt.FixedPointIteration(fixed_point_func, maxiter=20, verbose=False)
-    # Guess a solution for the eccentric anomaly.
     eccentric_anomaly_init = t
     eccentric_anomaly = solver.run(eccentric_anomaly_init).params
 
@@ -123,6 +123,7 @@ def generate_canonical_coordinates_for_trajectory(
         jnp.sqrt(1 + e) * jnp.sin(eccentric_anomaly / 2),
         jnp.sqrt(1 - e) * jnp.cos(eccentric_anomaly / 2),
     )
+    phi = (phi + 2 * jnp.pi) % (2 * jnp.pi)
 
     # Finally, compute the radial and angular momentum.
     f = 2 * jnp.pi * a / (period * jnp.sqrt(1 - (e**2)))
@@ -177,14 +178,14 @@ def polar_to_cartesian(
     return position_cartesian, momentum_cartesian
 
 
-def static_plot_coordinates_in_phase_space(
+def static_plot_coordinates(
     positions: chex.Array,
     momentums: chex.Array,
     title: str,
     fig: Optional[plt.Figure] = None,
     ax: Optional[plt.Axes] = None,
-    max_x_position: Optional[chex.Numeric] = None,
-    max_y_position: Optional[chex.Numeric] = None,
+    max_position: Optional[chex.Numeric] = None,
+    max_momentum: Optional[chex.Numeric] = None,
 ) -> plt.Figure:
     """Plots a static phase space diagram of the given coordinates."""
     assert len(positions) == len(momentums)
@@ -200,15 +201,13 @@ def static_plot_coordinates_in_phase_space(
     # Convert to Cartesian coordinates.
     qs, ps = jax.vmap(polar_to_cartesian)(qs, ps)
 
-    if fig is None:
-        # Create new Figure.
-        fig = plt.figure(figsize=(8, 6))
-
-    if ax is None:
-        # Add a subplot.
-        ax = plt.subplot(frameon=False)
+    if max_position is None:
+        q_max = np.max(np.abs(qs))
     else:
-        ax.set_frame_on(False)
+        q_max = max_position
+
+    fig, ax = plt.subplots(figsize=(8, 6), frameon=False, nrows=1, ncols=1)
+    ax.set_frame_on(False)
 
     # Add title.
     fig.text(
@@ -218,7 +217,7 @@ def static_plot_coordinates_in_phase_space(
         ha="center",
         va="center",
         fontsize=16,
-        transform=ax.transAxes,
+        transform=fig.transFigure,
     )
 
     ax.plot(
@@ -232,36 +231,111 @@ def static_plot_coordinates_in_phase_space(
     )
     ax.scatter(qs[0, 0], qs[0, 1], marker="o", s=30, color="gray", zorder=2)
 
-    if max_x_position is None:
-        qx_max = np.max(np.abs(qs[:, 0]))
-    else:
-        qx_max = max_x_position
-
-    if max_y_position is None:
-        qy_max = np.max(np.abs(qs[:, 1]))
-    else:
-        qy_max = max_y_position
-
-    ax.text(0, qy_max * 1.65, r"$q_y$", ha="center", va="center", size=14)
-    ax.text(qx_max * 1.6, 0, r"$q_x$", ha="center", va="center", size=14)
+    ax.text(0, q_max * 1.55, rf"$q_1$", ha="center", va="center", size=14)
+    ax.text(q_max * 1.55, 0, rf"$q_0$", ha="center", va="center", size=14)
 
     ax.plot(
-        [-qx_max * 1.5, qx_max * 1.5],
+        [-q_max * 1.45, q_max * 1.45],
         [0, 0],
         linestyle="dashed",
         color="black",
     )
     ax.plot(
         [0, 0],
-        [-qy_max * 1.5, qy_max * 1.5],
+        [-q_max * 1.45, q_max * 1.45],
         linestyle="dashed",
         color="black",
     )
 
-    ax.set_xlim(-(qx_max * 2), (qx_max * 2))
-    ax.set_ylim(-(qy_max * 2.5), (qy_max * 2.5))
+    ax.set_xlim(-(q_max * 2), (q_max * 2))
+    ax.set_ylim(-(q_max * 2.5), (q_max * 2.5))
+    ax.axis("equal")
 
     # No ticks.
     ax.set_xticks([])
     ax.set_yticks([])
+    return fig
+
+
+def static_plot_coordinates_in_phase_space(
+    positions: chex.Array,
+    momentums: chex.Array,
+    title: str,
+    fig: Optional[plt.Figure] = None,
+    ax: Optional[plt.Axes] = None,
+    max_position: Optional[chex.Numeric] = None,
+    max_momentum: Optional[chex.Numeric] = None,
+) -> plt.Figure:
+    """Plots a static phase space diagram of the given coordinates."""
+    assert len(positions) == len(momentums)
+
+    qs, ps = positions, momentums
+    qs, ps = np.asarray(qs), np.asarray(ps)
+    if qs.ndim == 1:
+        qs, ps = qs[Ellipsis, np.newaxis], ps[Ellipsis, np.newaxis]
+
+    assert qs.ndim == 2, f"Got positions of shape {qs.shape}."
+    assert ps.ndim == 2, f"Got momentums of shape {ps.shape}."
+
+    # Convert to Cartesian coordinates.
+    qs, ps = jax.vmap(polar_to_cartesian)(qs, ps)
+
+    if max_position is None:
+        q_max = np.max(np.abs(qs))
+    else:
+        q_max = max_position
+
+    if max_momentum is None:
+        p_max = np.max(np.abs(ps))
+    else:
+        p_max = max_momentum
+
+    fig, axs = plt.subplots(figsize=(16, 6), frameon=False, nrows=1, ncols=2)
+
+    # Add title.
+    fig.text(
+        x=0.5,
+        y=0.9,
+        s=title,
+        ha="center",
+        va="center",
+        fontsize=16,
+        transform=fig.transFigure,
+    )
+
+    for index, ax in enumerate(axs):
+        ax.set_frame_on(False)
+        ax.plot(
+            qs[:, index],
+            ps[:, index],
+            marker="o",
+            markersize=2,
+            linestyle="None",
+            color=plt.cm.inferno(0.1),
+            zorder=1,
+        )
+        ax.scatter(qs[0, index], ps[0, index], marker="o", s=30, color="gray", zorder=2)
+
+        ax.text(0, p_max * 1.7, rf"$p_{index}$", ha="center", va="center", size=14)
+        ax.text(q_max * 1.65, 0, rf"$q_{index}$", ha="center", va="center", size=14)
+
+        ax.plot(
+            [-q_max * 1.5, q_max * 1.5],
+            [0, 0],
+            linestyle="dashed",
+            color="black",
+        )
+        ax.plot(
+            [0, 0],
+            [-p_max * 1.5, p_max * 1.5],
+            linestyle="dashed",
+            color="black",
+        )
+
+        ax.set_xlim(-(q_max * 2), (q_max * 2))
+        ax.set_ylim(-(p_max * 2.5), (p_max * 2.5))
+
+        # No ticks.
+        ax.set_xticks([])
+        ax.set_yticks([])
     return fig
